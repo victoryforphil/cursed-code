@@ -22,9 +22,9 @@
 - [x] /wikify command - invoke wikify
 - [x] /commit command - invoke git
 
-## Phase 5: Future
-- [ ] prompt_pro expert - prompt engineering patterns
-- [ ] script_maker expert - creates Bun scripts with shebangs and best practices, invoked when scripts needed
+## Phase 5: Future ✓
+- [x] prompt_pro expert - prompt engineering patterns
+- [x] script_maker expert - creates Bun scripts with shebangs and best practices, invoked when scripts needed
 - [ ] Fetch OpenCode docs for config schemas
 
 ## Ideas

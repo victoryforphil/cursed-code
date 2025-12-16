@@ -35,3 +35,11 @@ Agents may reference an expert's PROMPT.md for domain context.
 - **scribe** - 1-1 faithful markdown conversion
 - **wikify** - Distill raw docs to condensed wiki format
 - **git** - Commit with repo-specific patterns, learns conventions
+
+## Available Experts
+
+- **scout** - Research strategies and MCP usage patterns
+- **meta** - Repository architecture and design decisions
+- **git** - Git workflows and commit conventions for this repo
+- **prompt_pro** - Prompt engineering patterns and best practices
+- **script_maker** - Bun script creation with proper conventions
