@@ -4,10 +4,7 @@
     ".opencode/instructions.md",
     ".opencode/experts/*/PROMPT.md"
   ],
-  "models": {
-    "code": "grok-code",
-    "fast": "grok-beta-fast"
-  },
+
   "mcp": {
     "context7": {
       "type": "remote",
