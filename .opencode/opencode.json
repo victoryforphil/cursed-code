@@ -34,7 +34,7 @@
       }
     },
     "git": {
-      "description": "Git workflow agent for commits with proper formatting and logical grouping",
+      "description": "Git workflow specialist. Use when committing changes - analyzes git status/diff, groups changes logically, creates commits with {Subject/Module} // {Message} format, learns repo patterns.",
       "mode": "subagent",
       "temperature": 0.1,
       "tools": {
