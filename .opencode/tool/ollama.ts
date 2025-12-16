@@ -90,15 +90,15 @@ export const ps = tool({
 export const pull = tool({
   description: "Download an Ollama model. Example: qwen2.5-coder:32b, deepseek-r1:32b",
   schema: z.object({
-    model: z.string().describe("Model name with optional tag (e.g., qwen2.5-coder:32b)"),
+    model_name: z.string().describe("Model name with optional tag (e.g., qwen2.5-coder:32b)"),
   }),
-  execute: async ({ model }) => {
+  execute: async ({ model_name }) => {
     try {
       // Use CLI for pull since it shows progress
-      const result = await ollamaCmd(["pull", model]);
-      return `✓ Pulled ${model}\n${result}`;
+      const result = await ollamaCmd(["pull", model_name]);
+      return `✓ Pulled ${model_name}\n${result}`;
     } catch (error) {
-      return `✗ Failed to pull ${model}: ${error instanceof Error ? error.message : String(error)}`;
+      return `✗ Failed to pull ${model_name}: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
 });

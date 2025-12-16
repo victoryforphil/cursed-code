@@ -29,7 +29,15 @@
       "command": [
         "npx",
         "-y",
-        "@joshrutkowski/applescript-mcp"
+        "@peakmojo/applescript-mcp"
+      ]
+    },
+    "desktop-automation": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "mcp-desktop-automation"
       ]
     }
   },
@@ -110,7 +118,39 @@
         "edit": false,
         "bash": false
       },
-      "mcp": ["applescript"]
+      "mcp": [
+        "applescript"
+      ]
+    },
+    "desktop-pro": {
+      "description": "Comprehensive macOS/cross-platform desktop control combining AppleScript (native) and desktop automation (screenshots, mouse, keyboard) for intelligent visual automation.",
+      "mode": "subagent",
+      "provider": "ollama",
+      "model": "llama3-groq-tool-use:8b",
+      "temperature": 0.2,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "mcp": [
+        "applescript",
+        "desktop-automation"
+      ]
+    },
+    "feature_documenter": {
+      "description": "Documents oh-my-opencode features by analyzing source code and creating concise implementation guides. Focused on code patterns, adaptation strategies, and actionable checklists.",
+      "mode": "subagent",
+      "model": "anthropic/claude-sonnet-4-5",
+      "temperature": 0.1,
+      "maxTokens": 8000,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "task": false,
+        "background_task": false,
+        "bash": false
+      }
     }
   },
   "provider": {
@@ -122,16 +162,72 @@
       },
       "models": {
         "qwen2.5-coder:32b": {
-          "name": "Qwen 2.5 Coder 32B",
-          "description": "Best coding model (HumanEval 79-82%)"
+          "name": "Qwen2.5 Coder 32B",
+          "description": "19 GB • 19 minutes ago"
         },
         "deepseek-r1:32b": {
-          "name": "DeepSeek R1 32B",
-          "description": "Best reasoning model (GSM8K 93.2%)"
+          "name": "Deepseek R1 32B",
+          "description": "19 GB About • an hour ago"
         },
         "llama3-groq-tool-use:8b": {
-          "name": "Llama 3 Groq Tool Use 8B",
-          "description": "Best function calling (BFCL 89%)"
+          "name": "Llama3 Groq Tool Use 8B",
+          "description": "4.7 GB About • an hour ago"
+        },
+        "qwen3-coder:30b": {
+          "name": "Qwen3 Coder 30B",
+          "description": "18 GB • 19 minutes ago"
+        },
+        "mistral-small:22b": {
+          "name": "Mistral Small 22B",
+          "description": "12 GB • 19 minutes ago"
+        },
+        "llama2-uncensored:7b": {
+          "name": "Llama2 Uncensored 7B",
+          "description": "3.8 GB • 5 hours ago"
+        },
+        "neural-chat:7b": {
+          "name": "Neural Chat 7B",
+          "description": "4.1 GB • 5 hours ago"
+        },
+        "qwen3:14b": {
+          "name": "Qwen3 14B",
+          "description": "9.3 GB • 7 hours ago"
+        },
+        "deepseek-r1:14b": {
+          "name": "Deepseek R1 14B",
+          "description": "9.0 GB • 7 hours ago"
+        },
+        "deepseek-r1:8b": {
+          "name": "Deepseek R1 8B",
+          "description": "5.2 GB • 7 hours ago"
+        },
+        "qwen3:8b": {
+          "name": "Qwen3 8B",
+          "description": "5.2 GB • 7 hours ago"
+        },
+        "deepseek-r1:1.5b": {
+          "name": "Deepseek R1 1.5B",
+          "description": "1.1 GB • 7 hours ago"
+        },
+        "qwen3:0.6b": {
+          "name": "Qwen3 0.6B",
+          "description": "522 MB • 7 hours ago"
+        },
+        "gemma3:1b": {
+          "name": "Gemma3 1B",
+          "description": "815 MB • 7 hours ago"
+        },
+        "qwen2.5-coder:1.5b": {
+          "name": "Qwen2.5 Coder 1.5B",
+          "description": "986 MB • 7 hours ago"
+        },
+        "gemma3:4b": {
+          "name": "Gemma3 4B",
+          "description": "3.3 GB • 2 weeks ago"
+        },
+        "gpt-oss:20b": {
+          "name": "Gpt Oss 20B",
+          "description": "13 GB • 2 weeks ago"
         }
       }
     }

@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  opencode:
+    image: ghcr.io/sst/opencode:latest
+    container_name: opencode
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENCODE_PORT=3000
+    volumes:
+      # Mount home directory
+      - ${HOME}:/workspace
+      # OpenCode config and data
+      - ~/.local/share/opencode:/root/.local/share/opencode
+      - ~/.config/opencode:/root/.config/opencode
+    working_dir: /workspace
+    command: ["web", "--port", "3000", "--hostname", "0.0.0.0"]
+    restart: unless-stopped
+
+volumes:
+  opencode-cache:
+    driver: local

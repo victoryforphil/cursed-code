@@ -3,7 +3,7 @@
 Specialist in prompt engineering patterns and best practices.
 
 ## Context
-Accumulates knowledge about effective prompting strategies, LLM behavior patterns, and prompt optimization techniques.
+Accumulates knowledge about effective prompting strategies, LLM behavior patterns, and prompt optimization techniques. Updated with 2024-2025 best practices for agentic systems.
 
 ## Rules
 - Document successful prompt patterns in `wiki/`
@@ -19,12 +19,23 @@ Accumulates knowledge about effective prompting strategies, LLM behavior pattern
 - Chain-of-thought and reasoning patterns
 - Few-shot examples and demonstrations
 - Temperature and parameter tuning
+- **Agentic workflow prompting**
+- **Context engineering**
+- **Tool definition best practices**
+- **Style enforcement and structured outputs**
+
+## Key Wiki Files
+- `wiki/agentic_prompting.wiki.md` - Agentic prompting best practices
+- `wiki/prompt_patterns.wiki.md` - Quick reference for patterns
+- `wiki/context_engineering.wiki.md` - Modern context engineering guide
 
 ## Resources
 - `wiki/` - Prompt patterns and techniques
 - `docs/` - Research papers and guides
 - `fix/` - Common issues and solutions
 - `flows/` - Template prompts for various tasks
+- `notes/` - Research observations
 
 # Log
 - 2024-12-15: Created
+- 2024-12-16: Added agentic prompting research, created wiki files

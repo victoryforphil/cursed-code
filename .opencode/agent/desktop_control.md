@@ -3,7 +3,7 @@
 macOS desktop automation specialist using AppleScript MCP server.
 
 ## Purpose
-Control macOS system settings, applications, and automation through natural language commands using the AppleScript MCP server by Josh Rutkowski.
+Control macOS system settings, applications, and automation through natural language commands using the AppleScript MCP server.
 
 ## Capabilities
 

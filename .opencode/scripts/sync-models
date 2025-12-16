@@ -77,50 +77,27 @@ function updateOpenCodeConfig(models: OllamaModel[]) {
     config.provider.ollama.models = {};
   }
   
-  // Add/update models in the provider.ollama.models object
-  const recommendedModels = [
-    { 
-      name: "qwen2.5-coder", 
-      tag: "32b", 
-      displayName: "Qwen 2.5 Coder 32B",
-      description: "Best coding model (HumanEval 79-82%)"
-    },
-    { 
-      name: "deepseek-r1", 
-      tag: "32b",
-      displayName: "DeepSeek R1 32B",
-      description: "Best reasoning model (GSM8K 93.2%)"
-    },
-    { 
-      name: "llama3-groq-tool-use", 
-      tag: "8b",
-      displayName: "Llama 3 Groq Tool Use 8B",
-      description: "Best function calling (BFCL 89%)"
-    },
-  ];
-  
-  for (const rec of recommendedModels) {
-    const found = models.find(m => m.name === rec.name && m.tag === rec.tag);
-    if (found) {
-      const modelKey = `${rec.name}:${rec.tag}`;
-      config.provider.ollama.models[modelKey] = {
-        name: rec.displayName,
-        description: rec.description
-      };
-    }
-  }
+  // Add/update all installed models to the provider.ollama.models object
+   for (const model of models) {
+     const modelKey = `${model.name}:${model.tag}`;
+     config.provider.ollama.models[modelKey] = {
+       name: formatModelName(model.name, model.tag),
+       description: `${model.size} • ${model.modified}`
+     };
+   }
   
   writeFileSync(OPENCODE_CONFIG, JSON.stringify(config, null, 2));
   console.log(`✅ Updated ${OPENCODE_CONFIG}`);
 }
 
-function getModelDescription(name: string): string {
-  const descriptions: Record<string, string> = {
-    "qwen2.5-coder": "Best coding model (HumanEval 79-82%)",
-    "deepseek-r1": "Best reasoning model (GSM8K 93.2%)",
-    "llama3-groq-tool-use": "Best function calling (BFCL 89%)",
-  };
-  return descriptions[name] || "Local Ollama model";
+function formatModelName(name: string, tag: string): string {
+   // Convert model:tag to human-readable format
+   // e.g., "qwen2.5-coder:32b" -> "Qwen 2.5 Coder 32B"
+   const words = name.split(/[-_]/).map(word => 
+     word.charAt(0).toUpperCase() + word.slice(1)
+   );
+   const formattedTag = tag.toUpperCase();
+   return `${words.join(" ")} ${formattedTag}`;
 }
 
 function normalizeModelName(name: string, tag: string): string {

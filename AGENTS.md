@@ -36,6 +36,7 @@ Agents may reference an expert's PROMPT.md for domain context.
 - **scout** - Research via MCPs, download docs, take notes, auto-create expert folders
 - **wikify** - Distill raw docs to condensed wiki format
 - **git** - Commit with repo-specific patterns, learns conventions
+- **feature_documenter** - Analyze source code features, create implementation guides (designed for parallel execution)
 
 ## Available Experts
 

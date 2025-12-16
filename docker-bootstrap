@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+
+# OpenCode Docker Bootstrap Script
+# This script sets up and starts the complete OpenCode Docker environment
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}=====================================${NC}"
+echo -e "${BLUE}   OpenCode Docker Bootstrap${NC}"
+echo -e "${BLUE}=====================================${NC}"
+echo ""
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+    echo -e "${RED}✗ Docker is not installed${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Docker is installed${NC}"
+
+# Check if Docker Compose is installed
+if ! command -v docker-compose &> /dev/null; then
+    echo -e "${RED}✗ Docker Compose is not installed${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Docker Compose is installed${NC}"
+
+# Check if opencode-web directory exists
+if [ ! -d "opencode-web" ]; then
+    echo ""
+    echo -e "${YELLOW}opencode-web directory not found${NC}"
+    echo "Cloning opencode-web repository..."
+    git clone https://github.com/chris-tse/opencode-web.git
+    echo -e "${GREEN}✓ opencode-web cloned${NC}"
+else
+    echo -e "${GREEN}✓ opencode-web directory exists${NC}"
+fi
+
+# Check if docker-compose.yml exists
+if [ ! -f "docker-compose.yml" ]; then
+    echo -e "${RED}✗ docker-compose.yml not found in current directory${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ docker-compose.yml found${NC}"
+
+# Check if Dockerfile.opencode exists
+if [ ! -f "Dockerfile.opencode" ]; then
+    echo -e "${RED}✗ Dockerfile.opencode not found in current directory${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Dockerfile.opencode found${NC}"
+
+echo ""
+echo -e "${BLUE}Building Docker images...${NC}"
+docker-compose build
+
+echo ""
+echo -e "${BLUE}Starting services...${NC}"
+docker-compose up -d
+
+echo ""
+echo -e "${YELLOW}Waiting for services to be healthy (this may take 1-2 minutes)...${NC}"
+
+# Wait for opencode-api to be healthy
+echo "Checking opencode-api..."
+for i in {1..60}; do
+    if docker-compose exec -T opencode-api curl -f http://localhost:7777 &> /dev/null; then
+        echo -e "${GREEN}✓ opencode-api is healthy${NC}"
+        break
+    fi
+    echo -n "."
+    sleep 2
+    if [ $i -eq 60 ]; then
+        echo ""
+        echo -e "${RED}✗ opencode-api failed to start${NC}"
+        exit 1
+    fi
+done
+
+# Wait for opencode-web to be healthy
+echo "Checking opencode-web..."
+for i in {1..60}; do
+    if docker-compose exec -T opencode-web curl -f http://localhost:5173 &> /dev/null; then
+        echo -e "${GREEN}✓ opencode-web is healthy${NC}"
+        break
+    fi
+    echo -n "."
+    sleep 2
+    if [ $i -eq 60 ]; then
+        echo ""
+        echo -e "${RED}✗ opencode-web failed to start${NC}"
+        exit 1
+    fi
+done
+
+echo ""
+echo -e "${GREEN}=====================================${NC}"
+echo -e "${GREEN}   ✓ OpenCode is Ready!${NC}"
+echo -e "${GREEN}=====================================${NC}"
+echo ""
+echo -e "${BLUE}Access Points:${NC}"
+echo -e "  Web UI:  ${YELLOW}http://localhost:5173${NC}"
+echo -e "  API:     ${YELLOW}http://localhost:7777${NC}"
+echo ""
+echo -e "${BLUE}Useful Commands:${NC}"
+echo -e "  View logs:     ${YELLOW}docker-compose logs -f${NC}"
+echo -e "  Stop services: ${YELLOW}docker-compose down${NC}"
+echo -e "  View status:   ${YELLOW}docker-compose ps${NC}"
+echo ""
+echo -e "${BLUE}Documentation:${NC}"
+echo -e "  Quick Start:     DOCKER_QUICK_REFERENCE.md"
+echo -e "  Full Setup:      OPENCODE_WEB_DOCKER_SETUP.md"
+echo ""
