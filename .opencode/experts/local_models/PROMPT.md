@@ -10,8 +10,11 @@ Expert for local_models. Accumulates knowledge about patterns, best practices, a
 - Log issues and solutions in fix/*.fix.md
 - Keep notes in notes/
 - Store raw docs in docs/
-- Track model benchmarks and performance metrics
+- Track model benchmarks and performance metrics in models/ (repo root)
 - Update recommendations as new models emerge
+- Use `.opencode/scripts/sync-models` to sync Ollama models to OpenCode config
+- Reference `wiki/ollama_usage.wiki.md` for Ollama commands and workflows
+- Update `models/*.md` files when new models are tested/evaluated
 
 ## Focus Areas
 - M1 Max 32GB memory optimization

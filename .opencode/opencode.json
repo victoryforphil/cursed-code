@@ -4,7 +4,6 @@
     ".opencode/instructions.md",
     ".opencode/experts/*/PROMPT.md"
   ],
-
   "mcp": {
     "context7": {
       "type": "remote",
@@ -16,7 +15,11 @@
     },
     "perplexity": {
       "type": "local",
-      "command": ["npx", "-y", "@perplexity-ai/mcp-server"],
+      "command": [
+        "npx",
+        "-y",
+        "@perplexity-ai/mcp-server"
+      ],
       "environment": {
         "PERPLEXITY_API_KEY": "{env:PERPLEXITY_API_KEY}"
       }
@@ -66,6 +69,34 @@
       "permission": {
         "webfetch": "ask"
       }
+    },
+    "local_models": {
+      "description": "Expert in local LLM deployment, optimization, and model selection for Apple Silicon (M1 Max 32GB) with Ollama",
+      "mode": "subagent",
+      "temperature": 0.3,
+      "tools": {
+        "write": true,
+        "edit": false,
+        "bash": false,
+        "webfetch": true
+      }
+    }
+  },
+  "modelProviders": {
+    "qwen-coder": {
+      "provider": "ollama",
+      "model": "qwen2.5-coder:32b",
+      "description": "Best coding model (HumanEval 79-82%)"
+    },
+    "deepseek-reasoning": {
+      "provider": "ollama",
+      "model": "deepseek-r1:32b",
+      "description": "Best reasoning model (GSM8K 93.2%)"
+    },
+    "groq-tools": {
+      "provider": "ollama",
+      "model": "llama3-groq-tool-use:8b",
+      "description": "Best function calling (BFCL 89%)"
     }
   }
 }
