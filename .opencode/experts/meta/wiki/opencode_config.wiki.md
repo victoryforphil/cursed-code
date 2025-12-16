@@ -61,11 +61,43 @@ Paths: relative to config, or absolute (`/`, `~`).
 ### Provider + Model
 ```json
 {
-  "provider": { "anthropic": { "options": { "apiKey": "{env:ANTHROPIC_API_KEY}" }}},
+  "provider": { 
+    "anthropic": { 
+      "options": { "apiKey": "{env:ANTHROPIC_API_KEY}" }
+    }
+  },
   "model": "anthropic/claude-sonnet-4-5",
   "small_model": "anthropic/claude-haiku-4-5"
 }
 ```
+
+### Ollama Local Models
+```json
+{
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen2.5-coder:32b": {
+          "name": "Qwen 2.5 Coder 32B",
+          "description": "Best coding model"
+        },
+        "deepseek-r1:32b": {
+          "name": "DeepSeek R1 32B",
+          "description": "Best reasoning model"
+        }
+      }
+    }
+  },
+  "model": "ollama/qwen2.5-coder:32b"
+}
+```
+
+**Important**: Models are defined within `provider.ollama.models`, NOT in a separate `modelProviders` key.
 
 ### Tools & Permissions
 ```json
@@ -105,3 +137,4 @@ If both set, `disabled_providers` wins for conflicts.
 
 # Log
 - 2024-12-16: Created from opencode_config_full.md
+- 2024-12-16: Added Ollama provider example with correct format

@@ -198,23 +198,64 @@ rm -rf ~/.ollama/cache/*  # Careful!
 
 ## Integration with OpenCode
 
-### Add model to opencode.json
+### Add Ollama provider to opencode.json
+
+**Correct format** (models go in `provider.ollama.models`):
 ```json
 {
-  "modelProviders": {
-    "qwen-coder": {
-      "provider": "ollama",
-      "model": "qwen2.5-coder:32b"
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen2.5-coder:32b": {
+          "name": "Qwen 2.5 Coder 32B",
+          "description": "Best coding model"
+        },
+        "deepseek-r1:32b": {
+          "name": "DeepSeek R1 32B",
+          "description": "Best reasoning model"
+        },
+        "llama3-groq-tool-use:8b": {
+          "name": "Llama 3 Groq Tool Use 8B",
+          "description": "Best function calling"
+        }
+      }
     }
-  }
+  },
+  "model": "ollama/qwen2.5-coder:32b"
 }
 ```
 
+**Important**: Do NOT use `modelProviders` - that's not valid. Models must be defined within `provider.ollama.models`.
+
+### Auto-sync with script
+```bash
+./.opencode/scripts/sync-models
+```
+
+This automatically updates your config with installed Ollama models.
+
 ### Use in agents
+Set the model in agent frontmatter:
 ```markdown
 ---
-model: qwen-coder
+model: ollama/qwen2.5-coder:32b
 ---
+```
+
+Or in agent config:
+```json
+{
+  "agent": {
+    "my-agent": {
+      "model": "ollama/deepseek-r1:32b"
+    }
+  }
+}
 ```
 
 ## Performance Notes for M1 Max 32GB
@@ -228,3 +269,4 @@ model: qwen-coder
 
 # Log
 - 2024-12-16: Created comprehensive Ollama usage guide
+- 2024-12-16: Fixed OpenCode config format - use provider.ollama.models, NOT modelProviders

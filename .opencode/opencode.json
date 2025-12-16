@@ -82,21 +82,27 @@
       }
     }
   },
-  "modelProviders": {
-    "qwen-coder": {
-      "provider": "ollama",
-      "model": "qwen2.5-coder:32b",
-      "description": "Best coding model (HumanEval 79-82%)"
-    },
-    "deepseek-reasoning": {
-      "provider": "ollama",
-      "model": "deepseek-r1:32b",
-      "description": "Best reasoning model (GSM8K 93.2%)"
-    },
-    "groq-tools": {
-      "provider": "ollama",
-      "model": "llama3-groq-tool-use:8b",
-      "description": "Best function calling (BFCL 89%)"
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "qwen2.5-coder:32b": {
+          "name": "Qwen 2.5 Coder 32B",
+          "description": "Best coding model (HumanEval 79-82%)"
+        },
+        "deepseek-r1:32b": {
+          "name": "DeepSeek R1 32B",
+          "description": "Best reasoning model (GSM8K 93.2%)"
+        },
+        "llama3-groq-tool-use:8b": {
+          "name": "Llama 3 Groq Tool Use 8B",
+          "description": "Best function calling (BFCL 89%)"
+        }
+      }
     }
   }
 }

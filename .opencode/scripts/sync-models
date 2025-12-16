@@ -3,11 +3,10 @@
 /**
  * sync-models
  * 
- * Syncs Ollama models to:
- * - .opencode/opencode.json model providers
- * - models/*.md documentation files
+ * Syncs Ollama models to .opencode/opencode.json provider configuration.
+ * Models are added to provider.ollama.models following OpenCode's config schema.
  * 
- * Usage: ./. opencode/scripts/sync-models
+ * Usage: ./.opencode/scripts/sync-models
  */
 
 import { exec } from "child_process";
@@ -58,24 +57,55 @@ function updateOpenCodeConfig(models: OllamaModel[]) {
     config = JSON.parse(readFileSync(OPENCODE_CONFIG, "utf-8"));
   }
   
-  if (!config.modelProviders) {
-    config.modelProviders = {};
+  // Initialize provider.ollama if it doesn't exist
+  if (!config.provider) {
+    config.provider = {};
   }
   
-  // Add/update model providers for our recommended models
+  if (!config.provider.ollama) {
+    config.provider.ollama = {
+      npm: "@ai-sdk/openai-compatible",
+      name: "Ollama (local)",
+      options: {
+        baseURL: "http://localhost:11434/v1"
+      },
+      models: {}
+    };
+  }
+  
+  if (!config.provider.ollama.models) {
+    config.provider.ollama.models = {};
+  }
+  
+  // Add/update models in the provider.ollama.models object
   const recommendedModels = [
-    { name: "qwen2.5-coder", tag: "32b", alias: "qwen-coder" },
-    { name: "deepseek-r1", tag: "32b", alias: "deepseek-reasoning" },
-    { name: "llama3-groq-tool-use", tag: "8b", alias: "groq-tools" },
+    { 
+      name: "qwen2.5-coder", 
+      tag: "32b", 
+      displayName: "Qwen 2.5 Coder 32B",
+      description: "Best coding model (HumanEval 79-82%)"
+    },
+    { 
+      name: "deepseek-r1", 
+      tag: "32b",
+      displayName: "DeepSeek R1 32B",
+      description: "Best reasoning model (GSM8K 93.2%)"
+    },
+    { 
+      name: "llama3-groq-tool-use", 
+      tag: "8b",
+      displayName: "Llama 3 Groq Tool Use 8B",
+      description: "Best function calling (BFCL 89%)"
+    },
   ];
   
   for (const rec of recommendedModels) {
     const found = models.find(m => m.name === rec.name && m.tag === rec.tag);
     if (found) {
-      config.modelProviders[rec.alias] = {
-        provider: "ollama",
-        model: `${rec.name}:${rec.tag}`,
-        description: getModelDescription(rec.name),
+      const modelKey = `${rec.name}:${rec.tag}`;
+      config.provider.ollama.models[modelKey] = {
+        name: rec.displayName,
+        description: rec.description
       };
     }
   }
@@ -114,10 +144,11 @@ async function main() {
   updateOpenCodeConfig(models);
   
   console.log("\n✅ Sync complete!");
-  console.log("\nModel providers available:");
+  console.log("\nOllama models configured:");
   const config = JSON.parse(readFileSync(OPENCODE_CONFIG, "utf-8"));
-  for (const [alias, provider] of Object.entries(config.modelProviders || {})) {
-    console.log(`   ${alias}: ${(provider as any).model}`);
+  const ollamaModels = config.provider?.ollama?.models || {};
+  for (const [modelKey, modelConfig] of Object.entries(ollamaModels)) {
+    console.log(`   ${modelKey}: ${(modelConfig as any).name}`);
   }
 }
 
