@@ -28,6 +28,8 @@ Agents may reference an expert's PROMPT.md for domain context.
 - Add `# Log` at end of files for evolution tracking
 - New ideas? Add to root TODO.md under "Ideas" section for review
 - It's okay to disagree when asked about designs - be a peer
+- When subagents return results, always relay them to the user
+- Git commits: always show hash and message to user after committing
 
 ## Available Agents
 
