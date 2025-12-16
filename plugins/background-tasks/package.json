@@ -1,0 +1,51 @@
+{
+  "name": "@cursed/background-tasks",
+  "version": "0.1.0",
+  "description": "Background task orchestration for OpenCode - launch agents in parallel, monitor progress, and get notified on completion",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm",
+    "build:full": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly",
+    "clean": "rm -rf dist",
+    "dev": "tsc --watch --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run clean && bun run build"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "background-tasks",
+    "async",
+    "agents",
+    "cursed-code"
+  ],
+  "author": "cursed-code",
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.7.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cursed-code/cursed-code",
+    "directory": "plugins/background-tasks"
+  },
+  "dependencies": {
+    "zod": "^4.2.1"
+  }
+}
