@@ -1,0 +1,4 @@
+{
+  "disabled_mcps": [],
+  "notes": "Scout agent will use any available research-related MCPs including Context7 (docs), Exa (web search), grep.app (GitHub code search), and others."
+}
