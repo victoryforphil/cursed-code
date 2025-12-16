@@ -24,22 +24,14 @@
   },
   "agent": {
     "scout": {
-      "description": "Research agent that gathers documentation and sources using available MCPs (Context7, Exa, grep.app, etc.)",
+      "description": "Research agent that gathers docs, downloads sources, and takes notes using MCPs (Context7, Perplexity, grep.app)",
       "mode": "subagent",
       "temperature": 0.3,
       "tools": {
         "write": true,
-        "bash": false
-      }
-    },
-    "scribe": {
-      "description": "Converts any source (URL, HTML, PDF) to clean markdown with 1-1 faithful conversion",
-      "mode": "subagent",
-      "temperature": 0.1,
-      "tools": {
-        "write": true,
-        "edit": false,
-        "bash": false
+        "bash": false,
+        "webfetch": true,
+        "download-page": true
       }
     },
     "wikify": {
@@ -60,6 +52,19 @@
         "bash": true,
         "write": false,
         "edit": false
+      }
+    },
+    "reviewer": {
+      "description": "Code review specialist that analyzes code for issues and improvements",
+      "mode": "subagent",
+      "temperature": 0.2,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "permission": {
+        "webfetch": "ask"
       }
     }
   }

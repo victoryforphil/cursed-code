@@ -33,8 +33,7 @@ Agents may reference an expert's PROMPT.md for domain context.
 
 ## Available Agents
 
-- **scout** - Research via MCPs, gather docs, auto-create expert folders
-- **scribe** - 1-1 faithful markdown conversion
+- **scout** - Research via MCPs, download docs, take notes, auto-create expert folders
 - **wikify** - Distill raw docs to condensed wiki format
 - **git** - Commit with repo-specific patterns, learns conventions
 

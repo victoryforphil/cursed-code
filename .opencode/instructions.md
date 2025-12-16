@@ -4,7 +4,6 @@
 
 - **Git commits** → Use git agent (subagent_type="git")
 - **Research/documentation** → Use scout agent (subagent_type="scout")
-- **Markdown conversion** → Use scribe agent (subagent_type="scribe")
 - **Wiki creation** → Use wikify agent (subagent_type="wikify")
 
 Never perform these tasks directly unless the agent fails.
@@ -15,3 +14,4 @@ Even if the user asks casually ("commit this", "commit recent work"), ALWAYS use
 
 # Log
 - 2024-12-16: Created to enforce agent delegation rules
+- 2024-12-16: Removed scribe (merged into scout)
