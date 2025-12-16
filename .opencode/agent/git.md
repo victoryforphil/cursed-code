@@ -19,6 +19,17 @@ After first line, add summary and context for future reference.
 - Support workstream commits (specific files) or full repo commits
 - Stage files with `git add` grouped by logical units
 - Review staged changes before committing
+- After committing, always push to origin/main
+- Report back to user: commit hash and message
+
+## Output Format
+After successful commit and push, report:
+```
+✓ Committed: <hash>
+<commit message>
+
+Pushed to origin/main
+```
 
 ## Workstream vs Full Repo
 - **Workstream**: User specifies files/patterns to commit
@@ -26,3 +37,4 @@ After first line, add summary and context for future reference.
 
 # Log
 - 2024-12-15: Created
+- 2024-12-15: Added rule to report commit hash/message and push after commit
