@@ -30,7 +30,9 @@ get_rc_file() {
 RC_FILE=$(get_rc_file)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="$SCRIPT_DIR/.opencode"
+MODELS_ENV="$CONFIG_DIR/models.env"
 EXPORT_LINE="export OPENCODE_CONFIG_DIR=\"$CONFIG_DIR\""
+SOURCE_LINE="[ -f \"$MODELS_ENV\" ] && source \"$MODELS_ENV\""
 
 # Read current RC content
 CONTENT=""
@@ -43,8 +45,14 @@ if [[ "$CONTENT" == *"$MARKER"* ]]; then
   echo "✓ cursed-code already configured in $RC_FILE"
 else
   # Append configuration
-  echo -e "\n$MARKER\n$EXPORT_LINE" >> "$RC_FILE"
-  echo "✓ Added OPENCODE_CONFIG_DIR to $RC_FILE"
+  cat >> "$RC_FILE" << EOF
+
+$MARKER
+$EXPORT_LINE
+$SOURCE_LINE
+EOF
+  echo "✓ Added cursed-code config to $RC_FILE"
 fi
 
 echo "  Config: $CONFIG_DIR"
+echo "  Models: $MODELS_ENV"

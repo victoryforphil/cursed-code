@@ -58,6 +58,7 @@
     "git": {
       "description": "Git workflow specialist. Use when committing changes - analyzes git status/diff, groups changes logically, creates commits with {Subject/Module} // {Message} format, learns repo patterns.",
       "mode": "subagent",
+      "model": "{env:OPENCODE_SUMMARY_FAST}",
       "temperature": 0.1,
       "tools": {
         "bash": true,
@@ -86,7 +87,16 @@
         "write": true,
         "edit": false,
         "bash": false,
-        "webfetch": true
+        "webfetch": true,
+        "ollama_list": true,
+        "ollama_ps": true,
+        "ollama_pull": true,
+        "ollama_stop": true,
+        "ollama_rm": true,
+        "ollama_show": true,
+        "ollama_status": true,
+        "ollama_generate": true,
+        "ollama_copy": true
       }
     },
     "desktop_control": {
