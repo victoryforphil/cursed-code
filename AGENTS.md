@@ -34,3 +34,4 @@ Agents may reference an expert's PROMPT.md for domain context.
 - **scout** - Research via MCPs, gather docs, auto-create expert folders
 - **scribe** - 1-1 faithful markdown conversion
 - **wikify** - Distill raw docs to condensed wiki format
+- **git** - Commit with repo-specific patterns, learns conventions
