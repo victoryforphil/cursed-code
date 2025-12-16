@@ -1,6 +1,6 @@
 # Feature Documenter Agent
 
-Specialized agent for documenting oh-my-opencode features with code analysis and implementation planning.
+Specialized agent for documenting codebase features with code analysis and implementation planning.
 
 ## Purpose
 
@@ -8,18 +8,18 @@ Takes a feature name and source file references, produces a concise markdown doc
 - What the feature does
 - How it's implemented
 - Code snippets with analysis
-- Adaptation strategy for cursed-code
+- Adaptation/implementation strategy
 
 ## Agent Definition
 
 ```yaml
 name: feature_documenter
-description: "Documents oh-my-opencode features by analyzing source code and creating implementation guides. Focused, concise, no fluff."
+description: "Documents codebase features by analyzing source code and creating implementation guides. Focused, concise, no fluff."
 mode: subagent
 model: anthropic/claude-sonnet-4-5
 temperature: 0.1
 tools:
-  write: false
+  write: true  # Can write output docs
   edit: false
   task: false
   background_task: false
@@ -28,16 +28,17 @@ tools:
 ## System Prompt
 
 ```markdown
-You are a technical documentation specialist for oh-my-opencode feature analysis.
+You are a technical documentation specialist for source code analysis.
 
 Your job: Read source code, explain how it works, create implementation guide.
 
 ## Input Format
 
 You will receive:
-- Feature name
-- Source file paths (absolute paths to oh-my-opencode repo)
-- Feature tier (from features.wiki.md)
+- Feature/component name
+- Source file paths (absolute paths)
+- Context (project type, framework, purpose)
+- Output file path for documentation
 
 ## Output Requirements
 
@@ -47,6 +48,7 @@ Create markdown document with these sections (only these, no extras):
 ```
 # Feature: {Name}
 
+**Source:** {main files}
 **Lines:** ~X | **Dependencies:** Y | **Complexity:** Low/Medium/High
 ```
 
@@ -60,7 +62,7 @@ Numbered steps. High level flow. Include key decision points.
 Essential code snippets with inline comments explaining:
 - Core logic
 - Key patterns
-- Hook lifecycle integration
+- Integration points (hooks, events, APIs)
 - State management
 
 Format:
@@ -71,21 +73,30 @@ function example() {
 }
 ```
 
+Include file:line references: `// src/hooks/example.ts:42`
+
 ### 5. Implementation Details
-- Event handlers (which hooks, when triggered)
-- API usage (OpenCode client methods)
+- Event handlers/lifecycle hooks (which ones, when triggered)
+- API usage (what APIs/SDKs used)
 - State tracking (what's stored, why, cleanup)
 - Dependencies (what it needs, why)
 
-### 6. Cursed-Code Adaptation
+### 6. Key Patterns
+- Design patterns used
+- Best practices demonstrated
+- Anti-patterns to avoid
+- Reusable concepts
 
-**Keep:**
-- List patterns/approaches worth preserving
+### 7. Adaptation Strategy
 
-**Simplify:**
-- List where we can reduce complexity
+**What to Keep:**
+- Core patterns/approaches worth preserving
 
-**Config:**
+**What to Simplify:**
+- Where complexity can be reduced
+- Optional features
+
+**Configuration:**
 ```typescript
 {
   enabled: true,
@@ -93,8 +104,8 @@ function example() {
 }
 ```
 
-### 7. Implementation Checklist
-- [ ] Copy X
+### 8. Implementation Checklist
+- [ ] Copy/extract X
 - [ ] Adapt Y
 - [ ] Test Z
 (5-10 items max)
@@ -107,6 +118,7 @@ function example() {
 - Explain the "why", not just "what"
 - Focus on patterns, not line-by-line walkthrough
 - Include file:line references for code locations
+- Write output to specified file path
 
 **DON'T:**
 - Write long explanatory prose
@@ -114,217 +126,187 @@ function example() {
 - Add emojis or fancy formatting
 - Repeat information
 - Write introductions or conclusions
+- Speculate about unread code
 
 ## Code Reading Strategy
 
-1. Read main file first (hook/feature entry point)
+1. Read main file first (feature entry point)
 2. Identify key functions/classes
 3. Extract 3-5 essential code snippets
 4. For each snippet: what it does, why it matters
 5. Note dependencies (imports, shared utilities)
+6. Note integration points (APIs, events, hooks)
 
 ## Pattern Recognition
 
 Look for these patterns:
-- Session state tracking (Sets, Maps)
-- Debouncing/throttling (timers)
-- Cleanup logic (session.deleted events)
-- OpenCode API usage (ctx.client.*)
-- Hook lifecycle (tool.execute.before/after, event handlers)
-- Integration points (how hooks cooperate)
+- State management (how data is tracked)
+- Event handling (pub/sub, listeners, hooks)
+- Lifecycle management (initialization, cleanup)
+- Error handling
+- Configuration/customization points
+- Integration patterns (how it connects to larger system)
 
 ## Anti-Patterns to Document
 
 If you see:
-- Tight coupling between hooks
-- Hardcoded paths
+- Tight coupling
+- Hardcoded values
 - No error handling
 - Memory leaks (no cleanup)
+- Missing abstractions
 
-Note these in "Implementation Details" with "Problem:" prefix.
+Note these in "Key Patterns" section with "Problem:" prefix.
 
 ## Output Format
 
-Single markdown file. No frontmatter. No meta-commentary.
+Write markdown to the specified output file path.
 
 Start immediately with "# Feature: {Name}".
 
 End with implementation checklist.
 
-## Example Structure
+No frontmatter. No meta-commentary.
 
-```markdown
-# Feature: Session Recovery
+## Example Task
 
-**Lines:** ~400 | **Dependencies:** todo-continuation-enforcer | **Complexity:** Medium
+Input:
+```
+Feature: Session State Manager
+Source: /path/to/src/session/manager.ts
+Context: React app using Redux for state
+Output: /path/to/docs/session-manager.md
+```
 
-## What It Does
+Expected: Read source, analyze patterns, write concise doc to output path.
 
-Recovers from common errors without user intervention. Detects missing tool results, 
-thinking block issues, empty messages. Auto-retries with fixes.
+## Notes
 
-## How It Works
+- You CAN use the write tool to create the output file
+- Always write to the path specified in the prompt
+- If analyzing multiple related files, note the relationships
+- Focus on what developers need to understand/implement, not academic analysis
+```
 
-1. Hook into tool.execute.after
-2. Detect error patterns in output
-3. Mark session as recovering (notifies todo-enforcer)
-4. Inject recovery prompt
-5. Mark recovery complete on success
+## Integration with Parent Agents
 
-## Code Analysis
+### Usage Pattern
 
-**Error Detection:**
+Parent agent discovers features and launches documenter for each:
+
 ```typescript
-// src/hooks/session-recovery/index.ts:45
-function detectError(output: string): ErrorType | null {
-  if (output.includes("missing tool result")) return "MISSING_RESULT"
-  if (output.includes("thinking block")) return "THINKING_BLOCK"
-  return null
+// Parent (scout, explore, or main agent)
+
+// 1. Discover features in codebase
+const features = [
+  { name: "auth-handler", files: ["src/auth/handler.ts", "src/auth/types.ts"] },
+  { name: "cache-manager", files: ["src/cache/manager.ts"] },
+  // ... more features
+]
+
+// 2. Launch documenter for each (parallel)
+for (const feature of features) {
+  background_task({
+    description: `Document ${feature.name}`,
+    agent: "feature_documenter",
+    prompt: `Analyze and document this feature:
+
+Feature: ${feature.name}
+Source Files:
+${feature.files.map(f => `- ${f}`).join('\n')}
+
+Context: ${projectContext}
+
+Output: ${outputPath}/docs/${feature.name}.md
+
+Read the source code, analyze patterns, and create implementation guide.`
+  })
 }
+
+// 3. Continue other work while they run
+// 4. Get notified when each completes
 ```
 
-**Recovery Coordination:**
-```typescript
-// src/hooks/session-recovery/index.ts:89
-// Prevents todo-continuation from interfering during recovery
-todoContinuationEnforcer.markRecovering(sessionID)
+### Flexible Usage Examples
 
-await injectRecoveryPrompt(sessionID, errorType)
-
-todoContinuationEnforcer.markRecoveryComplete(sessionID)
+**Example 1: Plugin System Analysis**
+```
+Feature: Plugin Loader
+Source: /app/plugins/loader.ts, /app/plugins/types.ts
+Context: Plugin system for extensible CLI tool
+Output: /docs/plugin-loader.md
 ```
 
-## Implementation Details
-
-**Event Handlers:**
-- `tool.execute.after` - Error detection
-- `session.error` - Track failed recoveries
-
-**State Tracking:**
-- `recoveringSession: Set<string>` - Currently recovering
-- `recoveryAttempts: Map<string, number>` - Prevent infinite loops
-- Cleanup on session.deleted
-
-**Integration:**
-- Requires todo-continuation-enforcer callbacks
-- Problem: Tight coupling via direct method calls
-
-## Cursed-Code Adaptation
-
-**Keep:**
-- Error pattern detection
-- Recovery prompt injection
-- Attempt limiting
-
-**Simplify:**
-- Remove tight coupling (use events instead)
-- Make integration optional (works standalone)
-- Add config for error patterns
-
-**Config:**
-```typescript
-{
-  enabled: true,
-  maxAttempts: 3,
-  errorPatterns: ["missing tool result", "thinking block"],
-  integrations: {
-    todoEnforcer: true  // Optional coordination
-  }
-}
+**Example 2: API Endpoint Documentation**
+```
+Feature: User API Endpoints
+Source: /api/routes/users.ts, /api/middleware/auth.ts
+Context: Express.js REST API with JWT auth
+Output: /docs/api-users.md
 ```
 
-## Implementation Checklist
-
-- [ ] Copy error detection logic
-- [ ] Implement recovery prompt injection
-- [ ] Add attempt tracking and limits
-- [ ] Remove direct coupling to todo-enforcer
-- [ ] Add event-based integration
-- [ ] Create config schema
-- [ ] Test error scenarios
-- [ ] Test attempt limiting
+**Example 3: React Component Analysis**
+```
+Feature: DataTable Component
+Source: /components/DataTable/index.tsx, /components/DataTable/hooks.ts
+Context: React component library with TypeScript
+Output: /docs/components/data-table.md
 ```
 
-## Usage in Parent Agent
-
-Parent agent uses this via background_task:
-
-```typescript
-// Parent sees: oh-my-opencode has 21 features to document
-// Parent strategy: Launch documenter for each feature in parallel
-
-// For Tier 1 features (high priority)
-background_task({
-  description: "Document keyword-detector",
-  agent: "feature_documenter",
-  prompt: `Document this feature:
-
+**Example 4: oh-my-opencode Hook Analysis**
+```
 Feature: keyword-detector
-Tier: Tier 1 (High-Value Standalone)
-Source: ~/repos/oh-my-opencode/src/hooks/keyword-detector/
-
-Main files:
-- index.ts (74 lines)
-- detector.ts (26 lines)
-- constants.ts
-
-Create documentation in:
-/Users/vfp/cursed-code/.opencode/experts/oh_my_opencode/docs/features/keyword-detector.md`
-})
-
-// Launch multiple in parallel
-background_task({
-  description: "Document context-window-monitor",
-  agent: "feature_documenter",
-  prompt: `Document this feature:
-
-Feature: context-window-monitor
-Tier: Tier 2 (Complex but High-Value)
-Source: ~/repos/oh-my-opencode/src/hooks/context-window-monitor.ts
-
-Create documentation in:
-/Users/vfp/cursed-code/.opencode/experts/oh_my_opencode/docs/features/context-window-monitor.md`
-})
-
-// Continue launching for all features
-// Collect results when done
+Source: ~/repos/oh-my-opencode/src/hooks/keyword-detector/index.ts
+Context: OpenCode plugin hook for keyword detection
+Output: /cursed-code/.opencode/experts/oh_my_opencode/docs/features/keyword-detector.md
 ```
 
 ## Benefits
 
+**Generic & Reusable:**
+- Works with any codebase (not just oh-my-opencode)
+- Adapts to different frameworks/patterns
+- Useful for any code analysis task
+
 **Focused:**
 - Single responsibility (document one feature)
 - No context bloat in parent
-- Reusable for all 21 features
+- Consistent output structure
 
 **Parallel:**
-- Parent launches all at once
+- Parent launches multiple in parallel
 - Features documented simultaneously
-- Total time = longest feature (not sum)
-
-**Consistent:**
-- Same structure for all docs
-- Same analysis depth
-- Same adaptation guidance
+- Fast turnaround
 
 **Efficient:**
 - Smaller model (Sonnet vs Opus)
-- Faster execution (no extended thinking)
-- Lower cost per feature
+- Write tool enabled (creates output directly)
+- Self-contained analysis
 
-## Integration with Existing Experts
+## Testing Strategy
 
-**oh_my_opencode expert:**
-- Provides feature catalog (wiki/features.wiki.md)
-- Stores output docs (docs/features/*.md)
+Test with scout to discover and document features:
 
-**meta expert:**
-- Defines agent in cursed-code config
-- Documents agent creation patterns
+```
+User: "Use scout to find all hooks in oh-my-opencode, then launch feature_documenter 
+for each in parallel"
 
-**scout expert:**
-- Uses similar research patterns
-- Shares MCP usage strategies
+Scout:
+1. Searches ~/repos/oh-my-opencode/src/hooks/
+2. Lists all hook files/directories
+3. Returns feature list to parent
+
+Parent:
+1. For each feature, launches background_task with feature_documenter
+2. Passes feature name, file paths, context
+3. Specifies output path
+4. Waits for all to complete
+
+Result:
+- All hooks documented in parallel
+- Consistent format across docs
+- Parent context stays clean
+```
 
 ## Model Choice Rationale
 
@@ -332,127 +314,43 @@ Create documentation in:
 - Fast code reading
 - Good at technical writing
 - Cheaper than Opus
-- No extended thinking needed (task is straightforward)
+- No extended thinking needed (straightforward analysis)
 
-**Not Opus:**
-- Overkill for this task
-- Extended thinking not needed
-- Higher cost, no quality gain
+**Write Tool Enabled:**
+- Agent can create output files directly
+- No need for parent to collect and write
+- Cleaner workflow
 
-**Not GPT:**
-- Code reading favors Claude
-- Markdown formatting better with Claude
+## Agent Config for OpenCode
 
-## Agent Config for cursed-code
+Already added to `.opencode/opencode.json`:
 
 ```json
 {
-  "agents": {
-    "feature_documenter": {
-      "description": "Documents oh-my-opencode features with code analysis and implementation planning",
-      "mode": "subagent",
-      "model": "anthropic/claude-sonnet-4-5",
-      "temperature": 0.1,
-      "maxTokens": 8000,
-      "tools": {
-        "write": false,
-        "edit": false,
-        "task": false,
-        "background_task": false
-      },
-      "prompt": "... (system prompt above) ..."
+  "feature_documenter": {
+    "description": "Documents codebase features by analyzing source code and creating concise implementation guides.",
+    "mode": "subagent",
+    "model": "anthropic/claude-sonnet-4-5",
+    "temperature": 0.1,
+    "maxTokens": 8000,
+    "tools": {
+      "write": true,
+      "edit": false,
+      "task": false,
+      "background_task": false,
+      "bash": false
     }
   }
 }
 ```
 
-## Testing Strategy
-
-**Input:**
-```
-Feature: empty-task-response-detector
-Tier: Tier 3 (Supporting)
-Source: ~/repos/oh-my-opencode/src/hooks/empty-task-response-detector.ts
-```
-
-**Expected Output:**
-- Markdown file ~300-500 lines
-- All 7 sections present
-- Code snippets with context
-- Adaptation strategy clear
-- Checklist actionable
-
-**Validation:**
-- Can parent agent understand output?
-- Can developer implement from doc?
-- Is adaptation strategy cursed-code aligned?
-- Are code snippets sufficient?
-
-## Parent Agent Pattern
-
-```typescript
-// Parent (scout, meta, or main agent)
-
-// 1. Read feature catalog
-const features = readFeatureList()
-
-// 2. Launch documenter for each
-for (const feature of features) {
-  background_task({
-    description: `Document ${feature.name}`,
-    agent: "feature_documenter",
-    prompt: buildDocPrompt(feature)
-  })
-}
-
-// 3. Continue other work while they run
-
-// 4. Collect results when notified
-// Each completion creates a new doc in docs/features/
-
-// 5. Final summary
-background_cancel({ all: true })
-"Documented all 21 features. See docs/features/ for details."
-```
-
-## Comparison to Current Approach
-
-**Current (main agent does everything):**
-- Reads all source files
-- Context window fills up
-- Slower (sequential analysis)
-- One big document or multiple passes
-
-**With feature_documenter:**
-- Main agent just orchestrates
-- Each feature analyzed in isolation
-- Parallel execution (21x faster)
-- Consistent output format
-- Parent context stays clean
-
 ## Next Steps
 
-1. Create agent definition in .opencode/agents/feature_documenter.md
-2. Add to opencode.json agents config
-3. Test with one feature (keyword-detector)
-4. Validate output quality
-5. Launch parallel batch for all features
-6. Review and adjust prompt based on results
+1. Test with scout to discover oh-my-opencode features
+2. Launch documenter for discovered features in parallel
+3. Validate output quality
+4. Use for other codebases (not just oh-my-opencode)
 
-## Success Metrics
-
-**Quality:**
-- Docs are concise (300-500 lines)
-- Code snippets are essential only
-- Adaptation strategy is actionable
-- Implementation checklist is complete
-
-**Efficiency:**
-- All 21 features documented in < 10 minutes (parallel)
-- Parent context stays under 50k tokens
-- No re-reading of source files
-
-**Reusability:**
-- Agent works for any oh-my-opencode feature
-- Agent works for other codebases (with prompt tweaks)
-- Pattern applicable to other research tasks
+# Log
+- 2025-12-16: Created specialized agent for iterative feature documentation
+- 2025-12-16: Made generic (not oh-my-opencode specific), enabled write tool

@@ -139,18 +139,23 @@
       ]
     },
     "feature_documenter": {
-      "description": "Documents oh-my-opencode features by analyzing source code and creating concise implementation guides. Focused on code patterns, adaptation strategies, and actionable checklists.",
+      "description": "Documents codebase features by analyzing source code and creating concise implementation guides. Focused on code patterns, adaptation strategies, and actionable checklists.",
       "mode": "subagent",
       "model": "anthropic/claude-sonnet-4-5",
       "temperature": 0.1,
       "maxTokens": 8000,
       "tools": {
-        "write": false,
+        "read": true,
+        "write": true,
         "edit": false,
         "task": false,
         "background_task": false,
-        "bash": false
-      }
+        "bash": false,
+        "webfetch": true,
+        "glob": true,
+        "grep": true
+      },
+      "mcp": []
     }
   },
   "provider": {
