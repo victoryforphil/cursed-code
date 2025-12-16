@@ -15,8 +15,12 @@ This expert tracks design decisions, architectural patterns, and lessons learned
 ## Resources
 - `wiki/` - Design patterns and conventions
 - `fix/` - Repository-specific issues and solutions
-- `flows/` - Workflows for managing this repo
+- `flows/` - Workflows for managing this repo (bootstrap, etc.)
 - `docs/` - Reference material about OpenCode and dotfiles
+
+## Flows
+- `bootstrap.flow.md` - Initial cursed-code setup and verification
 
 # Log
 - 2024-12-15: Created
+- 2024-12-16: Added bootstrap flow for initial setup automation
