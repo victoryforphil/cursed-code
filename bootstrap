@@ -1,0 +1,50 @@
+#!/bin/bash
+# cursed-code bootstrap
+
+set -e
+
+HOME=${HOME:-~}
+MARKER="# cursed-code"
+
+# Detect RC file: check $SHELL first, then fallback to existence
+get_rc_file() {
+  local bashrc="$HOME/.bashrc"
+  local zshrc="$HOME/.zshrc"
+  
+  case "$SHELL" in
+    *zsh*) echo "$zshrc" ;;
+    *bash*) echo "$bashrc" ;;
+    *)
+      # Fallback to existence check
+      if [[ -f "$zshrc" ]]; then
+        echo "$zshrc"
+      elif [[ -f "$bashrc" ]]; then
+        echo "$bashrc"
+      else
+        echo "$bashrc"
+      fi
+      ;;
+  esac
+}
+
+RC_FILE=$(get_rc_file)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="$SCRIPT_DIR/.opencode"
+EXPORT_LINE="export OPENCODE_CONFIG_DIR=\"$CONFIG_DIR\""
+
+# Read current RC content
+CONTENT=""
+if [[ -f "$RC_FILE" ]]; then
+  CONTENT=$(cat "$RC_FILE")
+fi
+
+# Check if already configured
+if [[ "$CONTENT" == *"$MARKER"* ]]; then
+  echo "✓ cursed-code already configured in $RC_FILE"
+else
+  # Append configuration
+  echo -e "\n$MARKER\n$EXPORT_LINE" >> "$RC_FILE"
+  echo "✓ Added OPENCODE_CONFIG_DIR to $RC_FILE"
+fi
+
+echo "  Config: $CONFIG_DIR"
