@@ -23,6 +23,14 @@
       "environment": {
         "PERPLEXITY_API_KEY": "{env:PERPLEXITY_API_KEY}"
       }
+    },
+    "applescript": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@joshrutkowski/applescript-mcp"
+      ]
     }
   },
   "agent": {
@@ -80,6 +88,19 @@
         "bash": false,
         "webfetch": true
       }
+    },
+    "desktop_control": {
+      "description": "macOS desktop automation specialist using AppleScript. Controls system settings, applications, calendar, reminders, clipboard, files, and more through natural language commands.",
+      "mode": "subagent",
+      "provider": "ollama",
+      "model": "llama3-groq-tool-use:8b",
+      "temperature": 0.2,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "mcp": ["applescript"]
     }
   },
   "provider": {
