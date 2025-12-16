@@ -1,0 +1,51 @@
+{
+  "name": "@cursed/usage-tracker",
+  "version": "0.1.0",
+  "description": "Track token usage by model and agent, including subagent calls",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target bun --format esm",
+    "build:full": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly",
+    "clean": "rm -rf dist",
+    "dev": "tsc --watch --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run clean && bun run build"
+  },
+  "keywords": [
+    "opencode",
+    "plugin",
+    "usage-tracker",
+    "tokens",
+    "analytics",
+    "cursed-code"
+  ],
+  "author": "cursed-code",
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": "*"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "typescript": "^5.7.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cursed-code/cursed-code",
+    "directory": "plugins/usage-tracker"
+  },
+  "dependencies": {
+    "zod": "^4.2.1"
+  }
+}

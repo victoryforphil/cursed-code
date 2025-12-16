@@ -1,9 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
+
   "instructions": [
     ".opencode/instructions.md",
     ".opencode/experts/*/PROMPT.md"
   ],
+
   "mcp": {
     "context7": {
       "type": "remote",
@@ -141,7 +143,7 @@
     "feature_documenter": {
       "description": "Documents codebase features by analyzing source code and creating concise implementation guides. Focused on code patterns, adaptation strategies, and actionable checklists.",
       "mode": "subagent",
-      "model": "anthropic/claude-sonnet-4-5",
+      "model": "github-copilot/claude-haiku-4.5",
       "temperature": 0.1,
       "maxTokens": 8000,
       "tools": {
@@ -157,6 +159,9 @@
       },
       "mcp": []
     }
+  },
+  "permission": {
+    "external_directory": "allow"
   },
   "provider": {
     "ollama": {

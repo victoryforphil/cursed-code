@@ -57,3 +57,18 @@
 - [ ] **context-window-monitor** - Warn before hitting token limits
 - [ ] **tool-output-truncator** - Smart truncation of large outputs
 - [ ] **keyword-detector** - Auto-mode switching (ultrawork, ultrathink)
+
+## Known Issues
+
+### usage-tracker Plugin (BROKEN)
+The `plugins/usage-tracker` plugin causes OpenCode to crash/corrupt on load. Attempted fixes:
+- Removed console.log/console.error calls
+- Removed toast notifications
+- Removed `chat.params` hook (wrong signature)
+- Simplified to only use documented `event` hook
+
+The issue persists even with just event hooks. Needs investigation into:
+- OpenCode plugin loading mechanism
+- Correct event hook signatures and return types
+- Whether Bun.file/Bun.write are safe in plugin context
+- Comparison with working oh-my-opencode plugin implementations
