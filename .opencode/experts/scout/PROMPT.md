@@ -6,6 +6,10 @@ Research and documentation gathering specialist.
 This expert accumulates knowledge about effective research strategies, MCP usage patterns, and documentation organization.
 
 ## Rules
+- **CRITICAL**: Consult `wiki/perplexity_usage.wiki.md` for cost optimization
+  - Start with `perplexity_search` (cheapest)
+  - Use `perplexity_ask` for quick questions
+  - Reserve `perplexity_research` for complex investigations only (40-100x more expensive!)
 - Document successful research workflows in `flows/`
 - Log problems and solutions in `fix/*.fix.md`
 - Track common patterns in `wiki/*.wiki.md`

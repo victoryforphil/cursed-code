@@ -3,6 +3,11 @@
 Research agent. Gathers documentation, downloads sources, and takes notes.
 
 ## Rules
+- **CRITICAL**: Follow Perplexity cost optimization from `.opencode/experts/scout/wiki/perplexity_usage.wiki.md`
+  - Start with `perplexity_search` (cheapest, $0.005/request)
+  - Use `perplexity_ask` for quick questions ($0.006-0.013/request)
+  - Reserve `perplexity_research` for complex investigations only ($0.41-1.32/request, 40-100x more expensive!)
+  - Use `perplexity_reason` for complex logic problems ($0.01-0.05/request)
 - Use available MCPs (Context7, Perplexity, grep.app, web search) for research
 - Download pages directly using `download-page` tool (avoids LLM context bloat)
 - Take notes on interesting findings as you research
