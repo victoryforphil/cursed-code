@@ -1,81 +1,101 @@
-# Feature: Background Task Manager
+# Feature: Background Task System
 
-**Lines:** ~1200 (manager + tools + hooks)  
-**Dependencies:** OpenCode session API  
-**Complexity:** High
+**Source:** BackgroundManager, background_task tools, background-notification hook  
+**Main Files:**
+- `src/features/background-agent/manager.ts` (420 LOC)
+- `src/tools/background-task/tools.ts` (330 LOC)
+- `src/hooks/background-notification/index.ts` (23 LOC)
+
+**Lines:** ~770 | **Dependencies:** OpenCode client/session API, hook system, event bus | **Complexity:** High
+
+---
 
 ## What It Does
 
-Runs agents in parallel child sessions while parent continues working. Fire-and-forget task execution with automatic completion notifications.
+Orchestrates async agent execution in child sessions - launches agents, monitors progress, notifies on completion. Runs background agents completely separate from the parent session, with polling-based progress tracking every 2 seconds, automatic completion detection via idle/todo checks, and parent session notification via toast + prompt injection.
 
-## The Problem
-
-Sequential task execution wastes time:
-```
-User: "Search codebase for auth AND fetch React docs AND implement feature"
-
-Bad (sequential):
-1. Search codebase (2 min) → wait
-2. Fetch docs (1 min) → wait  
-3. Implement (5 min) → wait
-Total: 8 minutes
-
-Good (parallel):
-1. Launch search in background
-2. Launch docs fetch in background
-3. Start implementing immediately
-4. Collect results when needed
-Total: 5 minutes (work overlaps)
-```
-
-## Architecture
-
-### Three Components
-
-**1. BackgroundManager** (`features/background-agent/manager.ts`)
-- Creates child sessions
-- Tracks task lifecycle
-- Polls for completion
-- Notifies parent session
-
-**2. Tools** (`tools/background-task/tools.ts`)
-- `background_task` - Launch agent in background
-- `background_output` - Get results (blocking or non-blocking)
-- `background_cancel` - Cancel running tasks
-
-**3. Hooks** (`hooks/background-notification/`)
-- Toast notifications when tasks complete
-- OS-level notifications
+---
 
 ## How It Works
 
-### 1. Launch Background Task
+1. **Launch (user calls `background_task` tool)**
+   - Create child session with `client.session.create()`
+   - Build BackgroundTask metadata (id, timestamps, status)
+   - Call `promptAsync()` with agent + disabled tools (prevent nested background tasks)
+   - Store task in manager, start polling interval if not running
 
-**Tool Definition:**
+2. **Event Handling (real-time updates)**
+   - Hook receives `message.part.updated` events → increment `toolCalls`, record `lastTool`
+   - Hook receives `session.idle` event → check todos (might be incomplete), mark completed if no todos
+   - Hook receives `session.deleted` event → cancel task, clean up notifications
+
+3. **Polling (every 2 seconds)**
+   - Fetch session status from `client.session.status()`
+   - If idle: check todos again (two-pass to catch async todo-continuation), fetch messages for progress
+   - Update `progress.toolCalls`, `progress.lastTool`, `progress.lastMessage`
+   - Stop polling when no running tasks remain
+
+4. **Completion & Notification**
+   - Mark task `status = "completed"`, queue for parent notification
+   - Send toast to user (TUI)
+   - Send prompt to parent session with "[BACKGROUND TASK COMPLETED]" message + task_id hint
+   - Clear notifications after delivery
+
+5. **Output Retrieval (user calls `background_output`)**
+   - Get task by id, check status
+   - If running + block=false: return current status
+   - If running + block=true: poll every 1s until completion or timeout
+   - If completed: fetch session messages, extract assistant's last text
+
+---
+
+## Code Analysis
+
+### BackgroundManager Constructor & Lifecycle
+
 ```typescript
-background_task({
-  description: "Short summary for status tracking",
-  prompt: "Full detailed prompt for the agent",
-  agent: "explore" | "librarian" | "oracle" | any registered agent
-})
+// src/features/background-agent/manager.ts:54-66
+export class BackgroundManager {
+  private tasks: Map<string, BackgroundTask>  // All tracked tasks
+  private notifications: Map<string, BackgroundTask[]>  // Notification queue per parent session
+  private client: OpencodeClient  // OpenCode API client
+  private directory: string  // Plugin directory
+  private pollingInterval?: Timer  // Single polling timer (started once, reused)
+
+  constructor(ctx: PluginInput) {
+    this.tasks = new Map()
+    this.notifications = new Map()
+    this.client = ctx.client
+    this.directory = ctx.directory
+  }
+}
 ```
 
-**Manager.launch():**
+**Pattern:** Singleton manager holds all tasks globally. Single polling interval timer for all tasks (efficient).
+
+### Task Launch Flow
+
 ```typescript
+// src/features/background-agent/manager.ts:68-135
 async launch(input: LaunchInput): Promise<BackgroundTask> {
-  // 1. Create child session
+  // Validate agent name
+  if (!input.agent || input.agent.trim() === "") {
+    throw new Error("Agent parameter is required")
+  }
+
+  // 1. Create child session linked to parent
   const createResult = await this.client.session.create({
     body: {
-      parentID: input.parentSessionID,
-      title: `Background: ${input.description}`,
+      parentID: input.parentSessionID,  // Linkage for UI hierarchy
+      title: `Background: ${input.description}`,  // Show in session list
     },
   })
-  
+
   const sessionID = createResult.data.id
-  
-  // 2. Create task record
+
+  // 2. Build task metadata
   const task: BackgroundTask = {
-    id: `bg_${crypto.randomUUID().slice(0, 8)}`,
+    id: `bg_${crypto.randomUUID().slice(0, 8)}`,  // Short task ID
     sessionID,
     parentSessionID: input.parentSessionID,
     description: input.description,
@@ -85,96 +105,160 @@ async launch(input: LaunchInput): Promise<BackgroundTask> {
     startedAt: new Date(),
     progress: { toolCalls: 0, lastUpdate: new Date() },
   }
-  
+
   this.tasks.set(task.id, task)
-  this.startPolling()
-  
-  // 3. Launch agent (async, non-blocking)
+  this.startPolling()  // Lazy-start polling
+
+  // 3. Fire agent asynchronously (fire-and-forget)
   this.client.session.promptAsync({
     path: { id: sessionID },
     body: {
       agent: input.agent,
       tools: {
-        task: false,              // Prevent recursive Task calls
-        background_task: false,   // Prevent nested background tasks
+        task: false,  // Prevent nested background_task calls
+        background_task: false,
       },
       parts: [{ type: "text", text: input.prompt }],
     },
   }).catch((error) => {
-    // Handle errors asynchronously
+    // Mark error if agent not found
     const existingTask = this.findBySession(sessionID)
     if (existingTask) {
       existingTask.status = "error"
-      existingTask.error = error.message
+      existingTask.error = error.includes("agent.name")
+        ? `Agent "${input.agent}" not found...`
+        : String(error)
       existingTask.completedAt = new Date()
       this.notifyParentSession(existingTask)
     }
   })
-  
+
   return task
 }
 ```
 
-**Key Points:**
-- `session.create()` with `parentID` establishes parent/child relationship
-- `promptAsync()` is fire-and-forget (doesn't block)
-- Tool restrictions prevent infinite recursion
-- Returns immediately with task ID
+**Key decisions:**
+- `promptAsync()` is fire-and-forget (not awaited) → returns immediately
+- Tools disabled to prevent recursive background tasks
+- Error catch runs async, doesn't block launch
 
-### 2. Track Progress
+### Event-Driven Progress Tracking
 
-**Polling Strategy:**
 ```typescript
-private startPolling(): void {
-  if (this.pollingInterval) return
-  
-  this.pollingInterval = setInterval(() => {
-    this.pollRunningTasks()
-  }, 2000)  // Poll every 2 seconds
-}
+// src/features/background-agent/manager.ts:177-240
+handleEvent(event: Event): void {
+  const props = event.properties
 
-private async pollRunningTasks(): Promise<void> {
-  // 1. Get all session statuses
-  const statusResult = await this.client.session.status()
-  const allStatuses = statusResult.data as Record<string, { type: string }>
-  
-  for (const task of this.tasks.values()) {
-    if (task.status !== "running") continue
-    
-    const sessionStatus = allStatuses[task.sessionID]
-    
-    // 2. Check if idle
-    if (sessionStatus.type === "idle") {
-      // 3. Verify no incomplete todos
-      const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
-      
-      if (!hasIncompleteTodos) {
-        task.status = "completed"
-        task.completedAt = new Date()
-        this.notifyParentSession(task)
-      }
-    }
-    
-    // 4. Fetch progress details
-    const messagesResult = await this.client.session.messages({
-      path: { id: task.sessionID },
-    })
-    
-    // Count tool calls, track last tool/message
-    for (const msg of assistantMessages) {
-      for (const part of msg.parts) {
-        if (part.type === "tool_use") {
-          task.progress.toolCalls++
-          task.progress.lastTool = part.tool
-        }
-        if (part.type === "text") {
-          task.progress.lastMessage = part.text
-          task.progress.lastMessageAt = new Date()
-        }
-      }
+  // Pattern 1: Tool execution detected
+  if (event.type === "message.part.updated") {
+    const task = this.findBySession(props.sessionID)
+    if (!task) return
+
+    if (props.type === "tool" || props.tool) {
+      // Increment tool count on every tool_use part
+      task.progress.toolCalls += 1
+      task.progress.lastTool = props.tool
+      task.progress.lastUpdate = new Date()
     }
   }
-  
+
+  // Pattern 2: Session idle (agent finished thinking)
+  if (event.type === "session.idle") {
+    const task = this.findBySession(props.sessionID)
+    if (!task || task.status !== "running") return
+
+    // Two-pass check: handle async todo-continuation hook
+    this.checkSessionTodos(sessionID).then((hasIncompleteTodos) => {
+      if (hasIncompleteTodos) {
+        log("[background-agent] Task has incomplete todos, waiting...")
+        return  // Don't mark completed yet
+      }
+
+      task.status = "completed"
+      task.completedAt = new Date()
+      this.markForNotification(task)
+      this.notifyParentSession(task)
+    })
+  }
+
+  // Pattern 3: Session manually deleted
+  if (event.type === "session.deleted") {
+    const task = this.findBySession(props.info.id)
+    if (!task) return
+
+    if (task.status === "running") {
+      task.status = "cancelled"
+      task.error = "Session deleted"
+    }
+    this.tasks.delete(task.id)
+    this.clearNotificationsForTask(task.id)  // Clean up queue
+  }
+}
+```
+
+**Patterns:**
+- `message.part.updated` → tool execution counter (real-time via event bus)
+- `session.idle` → ready to check completion (but async todo-continuation might add todos)
+- `session.deleted` → explicit cleanup
+
+### Polling Implementation (Fallback + Enhancement)
+
+```typescript
+// src/features/background-agent/manager.ts:346-425
+private async pollRunningTasks(): Promise<void> {
+  // Get all session statuses at once
+  const allStatuses = (await this.client.session.status()).data
+
+  for (const task of this.tasks.values()) {
+    if (task.status !== "running") continue
+
+    // Fallback: session not yet idle
+    const sessionStatus = allStatuses[task.sessionID]
+    if (sessionStatus?.type === "idle") {
+      // Double-check: might have async todos added
+      const hasIncompleteTodos = await this.checkSessionTodos(task.sessionID)
+      if (hasIncompleteTodos) continue
+
+      task.status = "completed"
+      task.completedAt = new Date()
+      this.markForNotification(task)
+      this.notifyParentSession(task)
+      continue
+    }
+
+    // Enhance progress from messages if still running
+    try {
+      const messagesResult = await this.client.session.messages({
+        path: { id: task.sessionID },
+      })
+
+      const messages = messagesResult.data
+      const assistantMsgs = messages.filter((m) => m.info?.role === "assistant")
+
+      let toolCalls = 0
+      let lastTool: string | undefined
+      let lastMessage: string | undefined
+
+      // Count tools + extract last message text
+      for (const msg of assistantMsgs) {
+        for (const part of msg.parts ?? []) {
+          if (part.type === "tool_use" || part.tool) {
+            toolCalls++
+            lastTool = part.tool || part.name
+          }
+          if (part.type === "text") lastMessage = part.text
+        }
+      }
+
+      task.progress.toolCalls = toolCalls
+      task.progress.lastTool = lastTool
+      task.progress.lastMessage = lastMessage  // For status display
+      task.progress.lastUpdate = new Date()
+    } catch (error) {
+      log("[background-agent] Poll error for task:", error)
+    }
+  }
+
   // Stop polling if no running tasks
   if (!this.hasRunningTasks()) {
     this.stopPolling()
@@ -182,531 +266,465 @@ private async pollRunningTasks(): Promise<void> {
 }
 ```
 
-**Event-Driven Completion:**
+**Key insight:** Polling runs every 2s but only counts running tasks. Once all tasks complete, polling stops (lazy-stop).
+
+### Notification Delivery
+
 ```typescript
-handleEvent(event: Event): void {
-  if (event.type === "session.idle") {
-    const sessionID = props.sessionID
-    const task = this.findBySession(sessionID)
-    
-    if (task && task.status === "running") {
-      this.checkSessionTodos(sessionID).then((hasIncompleteTodos) => {
-        if (!hasIncompleteTodos) {
-          task.status = "completed"
-          task.completedAt = new Date()
-          this.notifyParentSession(task)
-        }
-      })
-    }
-  }
-  
-  if (event.type === "message.part.updated") {
-    const task = this.findBySession(sessionID)
-    if (task && partInfo.type === "tool") {
-      task.progress.toolCalls += 1
-      task.progress.lastTool = partInfo.tool
-      task.progress.lastUpdate = new Date()
-    }
-  }
-}
-```
-
-**Hybrid Approach:**
-- **Events** for real-time updates (tool calls, idle state)
-- **Polling** as backup and for comprehensive progress (handles missed events)
-
-### 3. Detect Completion
-
-**Todo Check (Critical):**
-```typescript
-private async checkSessionTodos(sessionID: string): Promise<boolean> {
-  const response = await this.client.session.todo({
-    path: { id: sessionID },
-  })
-  const todos = response.data as Todo[]
-  
-  if (!todos || todos.length === 0) return false
-  
-  const incomplete = todos.filter(
-    (t) => t.status !== "completed" && t.status !== "cancelled"
-  )
-  
-  return incomplete.length > 0
-}
-```
-
-**Why Check Todos:**
-- Agent might go idle mid-task
-- Todo continuation enforcer will re-trigger agent
-- Only mark complete when truly done
-
-**Completion Criteria:**
-```
-session.idle + no incomplete todos = COMPLETED
-session.error                     = ERROR
-session.deleted                   = CANCELLED
-```
-
-### 4. Notify Parent
-
-**Notification Strategy:**
-```typescript
+// src/features/background-agent/manager.ts:282-323
 private notifyParentSession(task: BackgroundTask): void {
-  const duration = formatDuration(task.startedAt, task.completedAt)
-  
-  // 1. Show toast notification
-  const tuiClient = this.client as any
-  if (tuiClient.tui?.showToast) {
-    tuiClient.tui.showToast({
+  const duration = this.formatDuration(task.startedAt, task.completedAt)
+
+  // 1. Show toast (TUI)
+  if (this.client.tui?.showToast) {
+    this.client.tui.showToast({
       body: {
         title: "Background Task Completed",
         message: `Task "${task.description}" finished in ${duration}.`,
         variant: "success",
         duration: 5000,
       },
-    })
+    }).catch(() => {})
   }
-  
-  // 2. Inject message into parent session
-  const message = `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`
-  
+
+  // 2. Inject message into parent session (with 200ms delay for timing)
   setTimeout(async () => {
-    // Find previous message to respect agent mode
     const messageDir = getMessageDir(task.parentSessionID)
     const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-    
+
     await this.client.session.prompt({
       path: { id: task.parentSessionID },
       body: {
-        agent: prevMessage?.agent,  // Respect agent mode
-        parts: [{ type: "text", text: message }],
+        agent: prevMessage?.agent,  // Continue with same agent
+        parts: [
+          {
+            type: "text",
+            text: `[BACKGROUND TASK COMPLETED] Task "${task.description}" finished in ${duration}. Use background_output with task_id="${task.id}" to get results.`,
+          },
+        ],
       },
       query: { directory: this.directory },
     })
-    
+
     this.clearNotificationsForTask(task.id)
-  }, 200)  // Small delay to avoid races
+  }, 200)
 }
 ```
 
-**Two-Tier Notification:**
-1. **Toast** - User sees immediately
-2. **Prompt injection** - Agent sees and can act on results
+**Patterns:**
+- Toast for immediate UX feedback
+- Prompt injection for persistent record + hint about retrieving results
+- Delayed to avoid timing issues
 
-### 5. Retrieve Results
+### background_task Tool
 
-**Non-Blocking (Default):**
 ```typescript
-background_output({ task_id: "bg_abc123" })
+// src/tools/background-task/tools.ts:23-63
+export function createBackgroundTask(manager: BackgroundManager) {
+  return tool({
+    description: BACKGROUND_TASK_DESCRIPTION,
+    args: {
+      description: tool.schema.string().describe("Short task description"),
+      prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
+      agent: tool.schema.string().describe("Agent type to use"),
+    },
+    async execute(args: BackgroundTaskArgs, toolContext) {
+      try {
+        const task = await manager.launch({
+          description: args.description,
+          prompt: args.prompt,
+          agent: args.agent.trim(),
+          parentSessionID: toolContext.sessionID,  // Context injected
+          parentMessageID: toolContext.messageID,
+        })
 
-// Returns immediately:
-// - If completed: full results
-// - If running: current status (tool calls, last tool, progress)
-// - If error: error details
-```
-
-**Blocking (Rare):**
-```typescript
-background_output({ 
-  task_id: "bg_abc123",
-  block: true,
-  timeout: 60000  // Max 10 minutes
-})
-
-// Polls every 1 second until:
-// - Task completes → return results
-// - Task errors → return error
-// - Timeout → return current status
-```
-
-**Why Blocking Rare:**
-- System auto-notifies when done
-- Agent can continue other work
-- Only needed if must have results before proceeding
-
-**Result Formatting:**
-```typescript
-async formatTaskResult(task: BackgroundTask): Promise<string> {
-  // Fetch all messages from child session
-  const messagesResult = await client.session.messages({
-    path: { id: task.sessionID },
-  })
-  
-  // Extract assistant messages
-  const assistantMessages = messages.filter(m => m.info.role === "assistant")
-  
-  // Get last message text
-  const lastMessage = assistantMessages[assistantMessages.length - 1]
-  const textContent = lastMessage.parts
-    .filter(p => p.type === "text")
-    .map(p => p.text)
-    .join("\n")
-  
-  return `Task Result
+        return `Background task launched successfully.
 
 Task ID: ${task.id}
+Session ID: ${task.sessionID}
 Description: ${task.description}
-Duration: ${formatDuration(task.startedAt, task.completedAt)}
+Agent: ${task.agent}
 
----
-
-${textContent}`
-}
-```
-
-### 6. Cancel Tasks
-
-**Single Task:**
-```typescript
-background_cancel({ taskId: "bg_abc123" })
-
-// Aborts child session, marks cancelled
-```
-
-**All Tasks:**
-```typescript
-background_cancel({ all: true })
-
-// Best practice: call before delivering final answer
-// Cleans up any forgotten background tasks
-```
-
-**Abort Strategy:**
-```typescript
-// Fire-and-forget abort (critical!)
-client.session.abort({
-  path: { id: task.sessionID },
-}).catch(() => {})  // Don't await, don't propagate
-
-task.status = "cancelled"
-task.completedAt = new Date()
-```
-
-**Why Fire-and-Forget:**
-- Awaiting abort can abort parent session
-- Just mark cancelled locally
-- Child session cleanup happens async
-
-## Data Structures
-
-### BackgroundTask
-```typescript
-interface BackgroundTask {
-  id: string                    // "bg_a1b2c3d4"
-  sessionID: string             // Child session ID
-  parentSessionID: string       // Parent session ID
-  parentMessageID: string       // Message that launched task
-  description: string           // Short summary
-  prompt: string                // Full prompt sent to agent
-  agent: string                 // Agent type used
-  status: "running" | "completed" | "error" | "cancelled"
-  startedAt: Date
-  completedAt?: Date
-  error?: string
-  progress: TaskProgress
-}
-
-interface TaskProgress {
-  toolCalls: number             // Total tool invocations
-  lastTool?: string             // Most recent tool name
-  lastUpdate: Date              // Last progress update
-  lastMessage?: string          // Most recent text output
-  lastMessageAt?: Date          // When last message was sent
-}
-```
-
-### Manager State
-```typescript
-class BackgroundManager {
-  private tasks: Map<string, BackgroundTask>           // All tasks
-  private notifications: Map<string, BackgroundTask[]> // Pending notifications per parent
-  private pollingInterval?: Timer                      // Active polling timer
-}
-```
-
-## Usage Patterns
-
-### Pattern 1: Parallel Research
-```typescript
-// Launch both in parallel
-background_task({
-  description: "Search internal auth code",
-  prompt: "Find all authentication implementations in our codebase",
-  agent: "explore"
-})
-
-background_task({
-  description: "Fetch JWT docs",
-  prompt: "Find JWT best practices and examples from official docs",
-  agent: "librarian"
-})
-
-// Continue working immediately
-// System notifies when both complete
-// Collect results later
-```
-
-### Pattern 2: Long-Running Build
-```typescript
-background_task({
-  description: "Full production build",
-  prompt: "Run production build and report any errors",
-  agent: "build"
-})
-
-// Work on other tasks while building
-// Get notified when build finishes
-```
-
-### Pattern 3: Multiple Agents, Single Task
-```typescript
-// Comprehensive analysis
-background_task({
-  description: "Security audit",
-  prompt: "Audit codebase for security vulnerabilities",
-  agent: "explore"
-})
-
-background_task({
-  description: "Known CVE check",
-  prompt: "Check dependencies for known vulnerabilities",
-  agent: "librarian"
-})
-
-background_task({
-  description: "Architecture review",
-  prompt: "Review security architecture and propose improvements",
-  agent: "oracle"
-})
-
-// All run in parallel, notify when each completes
-```
-
-### Pattern 4: Cleanup Before Finish
-```typescript
-// Agent finishing work
-"I've completed the implementation. Let me clean up."
-
-// Cancel any forgotten background tasks
-background_cancel({ all: true })
-
-// Deliver final answer
-"Done. All tasks complete."
-```
-
-## OmO Integration
-
-OmO prompt enforces background task usage:
-
-**Default Behavior:**
-```
-### Parallel Execution (DEFAULT behavior)
-
-**Explore/Librarian = fire-and-forget tools**. Treat them like grep, not consultants.
-
-// CORRECT: Always background, always parallel
-background_task(agent="explore", prompt="Find auth implementations...")
-background_task(agent="explore", prompt="Find error handling patterns...")
-background_task(agent="librarian", prompt="Find JWT best practices...")
-// Continue working immediately. Collect with background_output when needed.
-
-// WRONG: Sequential or blocking
-result = task(...)  // Never wait synchronously for explore/librarian
-```
-
-**Completion Requirement:**
-```
-### Before Delivering Final Answer:
-- Cancel ALL running background tasks: background_cancel(all=true)
-- This conserves resources and ensures clean workflow completion
-```
-
-**Oracle Exception:**
-```
-Oracle is EXPENSIVE. Use blocking Task tool for oracle, not background_task.
-```
-
-## Implementation Details
-
-### Session Management
-```typescript
-// Create child session
-const createResult = await client.session.create({
-  body: {
-    parentID: input.parentSessionID,
-    title: `Background: ${input.description}`,
-  },
-})
-
-// Launch async (non-blocking)
-client.session.promptAsync({
-  path: { id: sessionID },
-  body: { agent, parts: [...] },
-})
-
-// Check status
-const statusResult = await client.session.status()
-const allStatuses = statusResult.data
-
-// Abort session
-client.session.abort({ path: { id: sessionID } })
-```
-
-### Error Handling
-```typescript
-// Launch errors
-this.client.session.promptAsync({ ... })
-  .catch((error) => {
-    const task = this.findBySession(sessionID)
-    if (task) {
-      task.status = "error"
-      
-      // Detect agent not found
-      if (errorMessage.includes("agent.name")) {
-        task.error = `Agent "${agent}" not found. Make sure it's registered.`
-      } else {
-        task.error = errorMessage
+The system will notify you when the task completes.
+Use \`background_output\` tool with task_id="${task.id}" to check progress.`
+      } catch (error) {
+        return `❌ Failed to launch background task: ${error.message}`
       }
-      
-      task.completedAt = new Date()
-      this.notifyParentSession(task)
-    }
+    },
   })
+}
 ```
 
-### Memory Management
+**User interface:** Simple args, returns task metadata + instructions.
+
+### background_output Tool (Status + Results)
+
 ```typescript
-// Cleanup on session deleted
-if (event.type === "session.deleted") {
-  const sessionID = props.info.id
-  const task = this.findBySession(sessionID)
-  
-  if (task) {
-    if (task.status === "running") {
+// src/tools/background-task/tools.ts:196-260
+export function createBackgroundOutput(manager: BackgroundManager, client: OpencodeClient) {
+  return tool({
+    description: BACKGROUND_OUTPUT_DESCRIPTION,
+    args: {
+      task_id: tool.schema.string().describe("Task ID to get output from"),
+      block: tool.schema.boolean().optional().describe("Wait for completion (default: false)"),
+      timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000)"),
+    },
+    async execute(args: BackgroundOutputArgs) {
+      const task = manager.getTask(args.task_id)
+      if (!task) return `Task not found: ${args.task_id}`
+
+      // Already completed: return result immediately
+      if (task.status === "completed") {
+        return await formatTaskResult(task, client)  // Fetch messages, extract text
+      }
+
+      // Error/cancelled: return status
+      if (task.status === "error" || task.status === "cancelled") {
+        return formatTaskStatus(task)
+      }
+
+      // Non-blocking and running: return status now
+      if (!args.block) {
+        return formatTaskStatus(task)
+      }
+
+      // Blocking: poll until completion
+      const startTime = Date.now()
+      while (Date.now() - startTime < args.timeout) {
+        await delay(1000)
+
+        const currentTask = manager.getTask(args.task_id)
+        if (currentTask?.status === "completed") {
+          return await formatTaskResult(currentTask, client)
+        }
+        if (currentTask?.status === "error" || currentTask?.status === "cancelled") {
+          return formatTaskStatus(currentTask)
+        }
+      }
+
+      // Timeout: return current status
+      return `Timeout exceeded. Task still running.\\n\\n${formatTaskStatus(task)}`
+    },
+  })
+}
+
+// Format depends on status
+function formatTaskStatus(task: BackgroundTask): string {
+  return `# Task Status
+| Field | Value |
+| Task ID | \`${task.id}\` |
+| Status | **${task.status}** |
+| Tool Calls | ${task.progress?.toolCalls} |
+| Last Tool | ${task.progress?.lastTool || "N/A"} |
+| Duration | ${formatDuration(task.startedAt, task.completedAt)} |`
+}
+
+async function formatTaskResult(task: BackgroundTask, client: OpencodeClient): Promise<string> {
+  // Fetch session messages
+  const messages = await client.session.messages({ path: { id: task.sessionID } })
+
+  // Extract last assistant message text
+  const assistantMsgs = messages.data.filter((m) => m.info?.role === "assistant")
+  const lastMsg = assistantMsgs[assistantMsgs.length - 1]
+  const textContent = lastMsg?.parts
+    ?.filter((p) => p.type === "text")
+    .map((p) => p.text)
+    .join("\n")
+
+  return `Task Result
+Task ID: ${task.id}
+Duration: ${formatDuration(task.startedAt, task.completedAt)}
+---
+${textContent || "(No text output)"}`
+}
+```
+
+**Dual-mode behavior:** Non-blocking returns status + hints; blocking polls + returns full result.
+
+### background_cancel Tool (Cancellation)
+
+```typescript
+// src/tools/background-task/tools.ts:262-331
+export function createBackgroundCancel(manager: BackgroundManager, client: OpencodeClient) {
+  return tool({
+    description: BACKGROUND_CANCEL_DESCRIPTION,
+    args: {
+      taskId: tool.schema.string().optional(),
+      all: tool.schema.boolean().optional(),
+    },
+    async execute(args: BackgroundCancelArgs, toolContext) {
+      if (args.all === true) {
+        // Get all tasks for this parent session
+        const tasks = manager.getTasksByParentSession(toolContext.sessionID)
+        const runningTasks = tasks.filter((t) => t.status === "running")
+
+        for (const task of runningTasks) {
+          // Fire-and-forget abort (don't await to avoid cascading abort)
+          client.session.abort({ path: { id: task.sessionID } }).catch(() => {})
+
+          task.status = "cancelled"
+          task.completedAt = new Date()
+        }
+
+        return `✅ Cancelled ${runningTasks.length} background task(s)`
+      }
+
+      // Cancel single task
+      const task = manager.getTask(args.taskId!)
+      if (!task) return `❌ Task not found: ${args.taskId}`
+      if (task.status !== "running") return `❌ Cannot cancel: already ${task.status}`
+
+      client.session.abort({ path: { id: task.sessionID } }).catch(() => {})
       task.status = "cancelled"
-      task.error = "Session deleted"
-    }
-    
-    this.tasks.delete(task.id)
-    this.clearNotificationsForTask(task.id)
+      task.completedAt = new Date()
+
+      return `✅ Task cancelled: ${task.id}`
+    },
+  })
+}
+```
+
+**Important:** `abort()` is fire-and-forget (no await) to avoid aborting the parent session.
+
+### Background Notification Hook
+
+```typescript
+// src/hooks/background-notification/index.ts:12-20
+export function createBackgroundNotificationHook(manager: BackgroundManager) {
+  const eventHandler = async ({ event }: EventInput) => {
+    // Delegate all event handling to manager
+    manager.handleEvent(event)
+  }
+
+  return {
+    event: eventHandler,  // Register as event hook
   }
 }
 ```
 
-## Performance Characteristics
+**One-liner:** Hook passes all events to manager. Manager decides what to do.
 
-### Network
-- Session creation: 1 API call per launch
-- Polling: 1 API call every 2s while tasks running
-- Progress tracking: 1 API call per poll per running task
-- Result fetching: 1 API call per retrieval
+---
 
-### Memory
-- ~500 bytes per task record
-- Task history accumulates (cleanup on session.deleted)
-- Polling timer runs only when tasks active
+## Implementation Details
 
-### CPU
-- Minimal (polling, event handling)
-- No heavy computation
+### Task Lifecycle States
 
-## Cursed-Code Adaptation
+| Status | Entry Point | Exit Condition | Actions |
+|--------|-------------|-----------------|---------|
+| `running` | `launch()` | `session.idle` + no todos → polling | Track progress, listen to events |
+| `completed` | idle event or polling | Final | Send notification, mark queue |
+| `error` | `promptAsync()` error | Final | Send notification, mark error message |
+| `cancelled` | `background_cancel()` or `session.deleted` | Final | Abort session, cleanup queue |
 
-### Keep
-- Core architecture (manager + tools + hooks)
-- Hybrid polling + events
-- Todo completion check
-- Agent mode respect in notifications
-- Fire-and-forget abort
-- Two-tier notifications
+### Event-Driven vs Polling Strategy
 
-### Simplify
-- Remove toast notifications (optional)
-- Remove OS notifications (optional)
-- Simpler progress tracking (just status, not full history)
+**Event-driven (real-time):**
+- `message.part.updated` → increment tool counter immediately
+- `session.idle` → check completion asynchronously
+- `session.deleted` → immediate cleanup
 
-### Enhance
-- Add result caching (avoid re-fetching messages)
-- Add task history limit (prevent unbounded growth)
-- Add configurable poll interval
-- Add max concurrent tasks limit
+**Polling (2s interval, fallback):**
+- Confirms session status (catch session.idle misses)
+- Fetches messages to count tools + extract progress
+- Stops when no running tasks
 
-### Config Schema
+**Why both?** Events are real-time but async (todo-continuation might add todos after idle). Polling catches this.
+
+### Todo-Aware Completion
+
 ```typescript
-{
-  enabled: true,
-  pollInterval: 2000,           // ms between polls
-  maxConcurrentTasks: 10,       // per session
-  resultCacheTTL: 300000,       // 5 min
-  enableToastNotifications: true,
-  enableOSNotifications: false,
+// src/features/background-agent/manager.ts:160-175
+private async checkSessionTodos(sessionID: string): Promise<boolean> {
+  try {
+    // Fetch todos from session
+    const response = await this.client.session.todo({ path: { id: sessionID } })
+    const todos = response.data ?? response
+
+    if (!todos || todos.length === 0) return false
+
+    // Check for incomplete todos
+    const incomplete = todos.filter(
+      (t) => t.status !== "completed" && t.status !== "cancelled"
+    )
+
+    return incomplete.length > 0
+  } catch {
+    return false
+  }
 }
 ```
 
-## Testing Scenarios
+**Pattern:** Called twice (after idle event + during polling) to catch async todo additions.
 
-### Happy Path
-1. Launch background task
-2. Task runs, makes tool calls
-3. Task completes
-4. Parent session notified
-5. Retrieve results with background_output
+### Notification Queue Management
 
-### Error Path
-1. Launch with invalid agent
-2. Error caught in promptAsync
-3. Task marked error
-4. Parent session notified with error
-5. background_output shows error details
+```typescript
+// src/features/background-agent/manager.ts:242-265
+markForNotification(task: BackgroundTask): void {
+  const queue = this.notifications.get(task.parentSessionID) ?? []
+  queue.push(task)
+  this.notifications.set(task.parentSessionID, queue)
+}
 
-### Concurrent Tasks
-1. Launch 3 tasks in parallel
-2. Track progress for all 3
-3. Tasks complete at different times
-4. Each completion triggers notification
-5. Retrieve results for each
+getPendingNotifications(sessionID: string): BackgroundTask[] {
+  return this.notifications.get(sessionID) ?? []
+}
 
-### Cancellation
-1. Launch task
-2. Task running
-3. Call background_cancel
-4. Task aborted and marked cancelled
-5. No notification sent
+clearNotifications(sessionID: string): void {
+  this.notifications.delete(sessionID)
+}
 
-### Cleanup
-1. Launch task
-2. Delete parent session
-3. Child session cleaned up
-4. Task removed from manager
-5. Polling stops if no tasks remain
+private clearNotificationsForTask(taskId: string): void {
+  for (const [sessionID, tasks] of this.notifications.entries()) {
+    const filtered = tasks.filter((t) => t.id !== taskId)
+    if (filtered.length === 0) {
+      this.notifications.delete(sessionID)
+    } else {
+      this.notifications.set(sessionID, filtered)
+    }
+  }
+}
+```
 
-## Value Proposition
+**Pattern:** Per-parent-session queue tracks completed tasks pending notification. Cleared after delivery or session deletion.
 
-**Why Extract This:**
-1. Killer feature - parallel execution is game-changer
-2. Well-architected - clean separation of concerns
-3. Battle-tested - used in production by oh-my-opencode users
-4. OpenCode native - uses platform APIs properly
-5. Agent mode compatible - respects parent agent context
+### Duration Formatting
 
-**Complexity Justified:**
-- Multi-session management is inherently complex
-- Implementation is well-structured despite size
-- Value >> complexity for workflow efficiency
+```typescript
+// src/features/background-agent/manager.ts:325-337
+private formatDuration(start: Date, end?: Date): string {
+  const duration = (end ?? new Date()).getTime() - start.getTime()
+  const seconds = Math.floor(duration / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m ${seconds % 60}s`
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`
+  }
+  return `${seconds}s`
+}
+```
+
+**Used for:** Toast messages, notification prompts, status displays.
+
+---
+
+## Key Patterns
+
+### Singleton Manager with Lazy Initialization
+
+- One BackgroundManager instance per plugin
+- Single polling interval timer (reused for all tasks)
+- Polling starts when first task launches, stops when all complete
+- Efficient resource usage
+
+### Event Bus Integration
+
+- Hook subscribes to all events (`message.part.updated`, `session.idle`, `session.deleted`)
+- Manager's `handleEvent()` is pure event handler (no side effects)
+- Events update task state in real-time, triggering completion checks
+
+### Fire-and-Forget Pattern for Background Operations
+
+```typescript
+// promptAsync() - don't await (agent runs independently)
+this.client.session.promptAsync({ ... }).catch((error) => { /* handle error */ })
+
+// abort() - don't await (prevents cascading abort to parent)
+client.session.abort({ path: { id: sessionID } }).catch(() => {})
+```
+
+**Why?** Awaiting could block parent session or cause cascade aborts.
+
+### Two-Pass Completion Detection
+
+1. **Event-based** (`session.idle` event): Quick, but async todos might be added after
+2. **Polling-based** (every 2s): Catches completed tasks + async todo additions
+3. **Fallback** (if both miss): `background_output` with block=true waits for user-initiated check
+
+### Parent Session Notification via Prompt Injection
+
+```typescript
+// Find previous message fields (agent, directory)
+const prevMessage = findNearestMessageWithFields(messageDir)
+
+// Inject into parent session (continues previous agent context)
+await this.client.session.prompt({
+  path: { id: task.parentSessionID },
+  body: {
+    agent: prevMessage?.agent,  // Reuse agent
+    parts: [{ type: "text", text: "[BACKGROUND TASK COMPLETED]..." }],
+  },
+  query: { directory: this.directory },
+})
+```
+
+**Benefit:** Notification appears in parent session's message history + agent can react.
+
+### Status vs Result Display Modes
+
+- **Status mode** (running/error): Show progress (tool count, last tool, duration)
+- **Result mode** (completed): Fetch messages, extract last assistant text
+- **Blocking poll** (user calls `background_output` with block=true): Wait up to 60s, then return whatever
+
+---
+
+## Adaptation Strategy
+
+### What to Keep
+
+1. **Manager singleton pattern** - Central task tracking is essential
+2. **Event + polling dual detection** - Catches all completion scenarios
+3. **Todo-aware completion check** - Critical for OpenCode integration
+4. **Fire-and-forget for background operations** - Prevents cascades
+5. **Notification queue per parent session** - Maintains session isolation
+
+### What to Simplify
+
+1. **Message injection complexity** - Could just queue notifications for UI display instead
+2. **Dual formatting for status/result** - Could use single format with conditional fields
+3. **Tool disable config** - Could allow some tools in background (with restrictions)
+
+### Configuration Template
+
+```typescript
+interface BackgroundTaskConfig {
+  enabled: true,
+  // How often to poll (ms)
+  pollInterval: 2000,
+  // Toast notification options
+  toast: {
+    enabled: true,
+    duration: 5000,
+    variant: "success",
+  },
+  // Timeout for background_output blocking mode (ms)
+  maxBlockTimeout: 600000,
+  // Whether to inject notification into parent session
+  injectNotification: true,
+  // Whether to check todos for completion
+  todoAware: true,
+  // Tools to disable in background sessions
+  disabledTools: ["task", "background_task"],
+}
+```
+
+---
 
 ## Implementation Checklist
 
-- [ ] Copy BackgroundManager class
-- [ ] Create background_task tool
-- [ ] Create background_output tool
-- [ ] Create background_cancel tool
-- [ ] Add event handlers (session.idle, message.part.updated, session.deleted)
-- [ ] Add todo completion check
-- [ ] Add polling mechanism
-- [ ] Add notification system
-- [ ] Test concurrent tasks
-- [ ] Test error handling
-- [ ] Test cancellation
-- [ ] Add config schema
-- [ ] Document usage patterns
-- [ ] Create examples
+- [ ] Copy BackgroundManager class (handle session lifecycle + polling)
+- [ ] Implement event handler in manager (handleEvent method)
+- [ ] Copy todo-checking logic (two-pass completion detection)
+- [ ] Create background_task tool (launch wrapper)
+- [ ] Create background_output tool (status + blocking retrieval)
+- [ ] Create background_cancel tool (cleanup)
+- [ ] Create notification hook (event bridge to manager)
+- [ ] Wire up toast notifications (or substitute with logging)
+- [ ] Test with long-running agent (verify polling works)
+- [ ] Test cancellation (verify fire-and-forget abort doesn't cascade)
+- [ ] Test todo-aware completion (verify two-pass todo check)
+

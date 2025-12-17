@@ -4,12 +4,21 @@ Notes, decisions, questions, and issues from porting oh-my-opencode plugins.
 
 ## Session: 2025-12-16
 
-### Completed Ports (4 plugins)
+### Completed Ports (4 single-file plugins)
 
 1. **empty-task-response-detector.ts** - Simplest, zero deps, ~40 lines
 2. **context-window-monitor.ts** - ~100 lines, uses session.messages API
 3. **todo-continuation-enforcer.ts** - ~180 lines, the "killer feature"
 4. **keyword-detector.ts** - ~150 lines, simplified from original
+
+### Completed Monorepo Plugins (1 plugin)
+
+1. **background-tasks/** - Full-featured background task orchestration (~755 lines)
+   - **Architecture:** BackgroundManager singleton + 3 tools + notification hooks
+   - **Features:** Parallel agent execution, progress monitoring, dual notifications (toast + prompt)
+   - **Config:** Enable/disable, max concurrent, polling interval, notification preferences
+   - **Status:** Ready for testing and npm publish
+   - **Package:** `@cursed/background-tasks`
 
 ---
 

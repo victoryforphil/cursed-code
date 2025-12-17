@@ -16,7 +16,7 @@ Takes a feature name and source file references, produces a concise markdown doc
 name: feature_documenter
 description: "Documents codebase features by analyzing source code and creating implementation guides. Focused, concise, no fluff."
 mode: subagent
-model: anthropic/claude-sonnet-4-5
+model: github-copilot/claude-haiku-4.5
 temperature: 0.1
 tools:
   write: true  # Can write output docs

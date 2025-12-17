@@ -2,18 +2,14 @@
 
 Track token usage by model and agent, including subagent calls.
 
-> **⚠️ STATUS: BROKEN**
-> 
-> This plugin currently causes OpenCode to crash/corrupt on load. The issue appears to be with event hooks or the plugin loading mechanism itself, not console output. Needs further investigation into OpenCode's plugin API.
-
 ## Features
 
 - **Per-session tracking**: Tokens, cost, and model distribution
 - **Subagent aggregation**: Tracks Task tool spawned agents via parentID linking
 - **Per-agent breakdown**: See which agents used which models
+- **Real-time TUI sidebar**: Live usage stats in the OpenCode TUI sidebar
 - **Multiple output channels**:
-  - Console summary on session.idle
-  - Toast notification with brief stats
+  - TUI sidebar with real-time stats
   - JSON export to `.opencode/usage-stats.json`
   - On-demand `/usage_report` tool
 
@@ -27,13 +23,26 @@ bun run build
 
 Then link or copy `dist/index.js` to your `.opencode/plugin/` directory.
 
+**Note**: The TUI sidebar integration requires a forked version of OpenCode that supports the `tui.sidebar.sections` hook. The plugin will still work with standard OpenCode but will only provide the JSON export and `usage_report` tool.
+
 ## Usage
 
-The plugin runs automatically once installed. After each session:
+The plugin runs automatically once installed. It provides:
 
-1. **Console output**: Displays a formatted usage report
-2. **Toast notification**: Brief summary with token count and cloud/local split
-3. **JSON export**: Appends session stats to `.opencode/usage-stats.json`
+1. **TUI Sidebar**: Real-time usage stats displayed in the OpenCode TUI sidebar
+2. **JSON export**: Appends session stats to `.opencode/usage-stats.json` when sessions end
+3. **On-demand reports**: Use the `usage_report` tool anytime during a session
+
+### TUI Sidebar Integration
+
+When using OpenCode TUI mode, the plugin automatically displays a "Usage Stats" section in the sidebar showing:
+
+- Total tokens (input/output/reasoning)
+- Session cost
+- Top 3 models with token counts and call counts
+- Number of active agents (if more than 1)
+
+The sidebar section is collapsible and updates in real-time as you use OpenCode.
 
 ### On-demand Report
 

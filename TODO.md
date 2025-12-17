@@ -27,24 +27,8 @@
 - [x] script_maker expert - creates Bun scripts with shebangs and best practices, invoked when scripts needed
 - [x] Fetch OpenCode docs for config schemas
 
-## Phase 6: SWE Workflow ✓
-- [x] planner agent - DeepSeek-R1 for task decomposition
-- [x] architect agent - Qwen 2.5 for implementation specs
-- [x] coder agent - Qwen 2.5 for fast execution
-- [x] swe_workflow expert - workflow documentation
-
 ## Ideas
 <!-- Agents: add ideas here for review -->
-
-### SWE Workflow Enhancements
-- [ ] **Orchestrator agent** - Auto-chain planner→architect→coder without manual handoff
-- [ ] **Reviewer agent** - Validates coder output before commit (code quality, test coverage)
-- [ ] **Spec files** - Architect writes to `.opencode/specs/` for complex multi-file changes
-- [ ] **/swe command** - Single command to trigger full pipeline
-- [ ] **Memory/learning** - Track which patterns work well per-codebase
-- [ ] **Parallel execution** - Run multiple coder instances for independent tasks
-- [ ] **Verification hooks** - Auto-run tests after coder completes
-- [ ] **Rollback capability** - Undo coder changes if verification fails
 
 ### Agent Improvements
 - [ ] **Tool use model** - Test llama3-groq-tool-use:8b for simple tasks (faster, smaller)

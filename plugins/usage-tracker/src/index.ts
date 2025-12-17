@@ -2,7 +2,7 @@
  * @cursed/usage-tracker
  *
  * Track token usage by model and agent, including subagent calls.
- * Exposes data via usage_report tool only - no auto-display.
+ * Exposes data via usage_report tool and TUI sidebar display.
  */
 
 import type { Plugin } from '@opencode-ai/plugin'
@@ -87,6 +87,134 @@ const UsageTrackerPlugin: Plugin = async (ctx) => {
           }
         },
       }),
+    },
+
+    /**
+     * TUI sidebar integration - show real-time usage stats
+     */
+    'tui.sidebar.sections': async () => {
+      // Always return a section, even if no data yet
+      if (!currentSessionID) {
+        return [
+          {
+            id: 'usage-tracker',
+            title: 'Usage Stats',
+            priority: 80,
+            collapsible: true,
+            defaultExpanded: true,
+            items: [
+              {
+                type: 'text' as const,
+                label: 'Status',
+                value: 'Waiting for session...',
+              },
+            ],
+          },
+        ]
+      }
+
+      const stats = tracker.getAggregatedStats(currentSessionID)
+      if (!stats || (stats.totals.input === 0 && stats.totals.output === 0)) {
+        return [
+          {
+            id: 'usage-tracker',
+            title: 'Usage Stats',
+            priority: 80,
+            collapsible: true,
+            defaultExpanded: true,
+            items: [
+              {
+                type: 'text' as const,
+                label: 'Total Tokens',
+                value: '0',
+              },
+              {
+                type: 'text' as const,
+                label: 'Total Cost',
+                value: '$0.0000',
+              },
+            ],
+          },
+        ]
+      }
+
+      // Format cost for display
+      const cost = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 4,
+      }).format(stats.totals.cost)
+
+      // Calculate total tokens
+      const totalTokens = stats.totals.input + stats.totals.output + stats.totals.reasoning
+
+      // Get model breakdown (show top 3 models)
+      const modelEntries = Array.from(stats.byModel.entries())
+        .map(([key, model]) => ({
+          name: key,
+          totalTokens: model.tokens.input + model.tokens.output + model.tokens.reasoning,
+          cost: model.cost,
+          calls: model.callCount,
+        }))
+        .sort((a, b) => b.totalTokens - a.totalTokens)
+        .slice(0, 3)
+
+      const items = [
+        {
+          type: 'text' as const,
+          label: 'Total Tokens',
+          value: totalTokens.toLocaleString(),
+        },
+        {
+          type: 'text' as const,
+          label: 'Input Tokens',
+          value: stats.totals.input.toLocaleString(),
+        },
+        {
+          type: 'text' as const,
+          label: 'Output Tokens',
+          value: stats.totals.output.toLocaleString(),
+        },
+        ...(stats.totals.reasoning > 0
+          ? [
+              {
+                type: 'text' as const,
+                label: 'Reasoning Tokens',
+                value: stats.totals.reasoning.toLocaleString(),
+              },
+            ]
+          : []),
+        {
+          type: 'text' as const,
+          label: 'Total Cost',
+          value: cost,
+        },
+        ...modelEntries.map((model) => ({
+          type: 'text' as const,
+          label: model.name,
+          value: `${model.totalTokens.toLocaleString()} tokens (${model.calls} calls)`,
+        })),
+        ...(stats.agents.size > 1
+          ? [
+              {
+                type: 'text' as const,
+                label: 'Agents',
+                value: `${stats.agents.size} active`,
+              },
+            ]
+          : []),
+      ]
+
+      return [
+        {
+          id: 'usage-tracker',
+          title: 'Usage Stats',
+          priority: 80, // Show after built-in sections but before other plugins
+          collapsible: true,
+          defaultExpanded: true,
+          items,
+        },
+      ]
     },
   }
 }

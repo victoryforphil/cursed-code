@@ -37,7 +37,3 @@ const BackgroundTasksPlugin: Plugin = async (ctx) => {
 }
 
 export default BackgroundTasksPlugin
-
-// Re-export types for consumers
-export type { BackgroundTask, BackgroundTaskStatus, TaskProgress } from "./types"
-export { BackgroundManager } from "./manager"
